@@ -1,5 +1,6 @@
 import re
-from typing import Dict, List, Tuple, Optional, Any
+import random
+from typing import Dict, List, Tuple, Optional, Any, Set
 from difflib import SequenceMatcher
 
 
@@ -449,3 +450,191 @@ def find_best_match(
         return (best_match, best_score, best_breakdown)
     
     return None
+
+
+def calculate_similarity_components(bib_entry: Dict[str, Any], arxiv_entry: Dict[str, Any]) -> Dict[str, float]:
+    """
+    Calculate individual similarity components for title, authors, year.
+    
+    This function provides detailed breakdown of similarity scores between
+    a BibTeX entry and an arXiv reference, useful for dataset construction
+    and model training where individual feature scores are needed.
+    
+    Parameters
+    ----------
+    bib_entry : Dict[str, Any]
+        Cleaned BibTeX entry with normalized fields:
+        - normalized_title: str
+        - normalized_authors: List[str]
+        - normalized_year: str
+    arxiv_entry : Dict[str, Any]
+        Cleaned arXiv reference with same normalized fields
+        
+    Returns
+    -------
+    Dict[str, float]
+        Dictionary with keys:
+        - total_score: Weighted combination (0-1)
+        - title_score: Title similarity (0-1)
+        - author_score: Author overlap (0-1)
+        - year_score: Year match (0-1)
+        
+    Examples
+    --------
+    >>> bib = {'normalized_title': 'deep learning networks',
+    ...        'normalized_authors': ['smith john', 'doe jane'],
+    ...        'normalized_year': '2023'}
+    >>> arxiv = {'normalized_title': 'deep learning neural networks',
+    ...          'normalized_authors': ['smith john'],
+    ...          'normalized_year': '2023'}
+    >>> scores = calculate_similarity_components(bib, arxiv)
+    >>> scores['total_score']
+    0.82
+    >>> scores['title_score']
+    0.85
+    
+    Notes
+    -----
+    Default weights: title (50%), authors (30%), year (20%)
+    Uses SequenceMatcher for fast approximate string matching.
+    """
+    # Title similarity (using SequenceMatcher for quick ratio)
+    title_bib = bib_entry.get('normalized_title', '').lower()
+    title_arxiv = arxiv_entry.get('normalized_title', '').lower()
+    title_score = SequenceMatcher(None, title_bib, title_arxiv).ratio() if title_bib and title_arxiv else 0.0
+    
+    # Author similarity (Jaccard similarity on author sets)
+    authors_bib = set(bib_entry.get('normalized_authors', []))
+    authors_arxiv = set(arxiv_entry.get('normalized_authors', []))
+    if authors_bib and authors_arxiv:
+        intersection = len(authors_bib & authors_arxiv)
+        union = len(authors_bib | authors_arxiv)
+        author_score = intersection / union if union > 0 else 0.0
+    else:
+        author_score = 0.0
+    
+    # Year similarity (exact match or close)
+    year_bib = bib_entry.get('normalized_year', '')
+    year_arxiv = arxiv_entry.get('normalized_year', '')
+    if year_bib and year_arxiv:
+        try:
+            year_diff = abs(int(year_bib) - int(year_arxiv))
+            year_score = 1.0 if year_diff == 0 else (0.5 if year_diff == 1 else 0.0)
+        except (ValueError, TypeError):
+            year_score = 0.0
+    else:
+        year_score = 0.0
+    
+    # Weighted total score (matches typical matching priorities)
+    total_score = 0.5 * title_score + 0.3 * author_score + 0.2 * year_score
+    
+    return {
+        'total_score': total_score,
+        'title_score': title_score,
+        'author_score': author_score,
+        'year_score': year_score
+    }
+
+
+def find_hard_negative(
+    bib_entry: Dict[str, Any],
+    arxiv_pool: List[Dict[str, Any]],
+    positive_arxiv_id: str
+) -> Optional[Tuple[Dict[str, Any], Dict[str, float]]]:
+    """
+    Find a hard negative example for contrastive learning.
+    
+    Hard negatives are papers that share some superficial similarities
+    (same year OR title word overlap) but are not true matches. These
+    help models learn fine-grained distinctions.
+    
+    Strategy:
+    1. Filter candidates that share year OR have 2+ meaningful title words
+    2. Exclude candidates with high similarity (>0.5) to avoid false negatives
+    3. Exclude the positive match itself
+    4. Return the "hardest" negative (highest score among valid candidates)
+    
+    Parameters
+    ----------
+    bib_entry : Dict[str, Any]
+        BibTeX reference to find negative for
+    arxiv_pool : List[Dict[str, Any]]
+        Pool of arXiv papers to sample from
+    positive_arxiv_id : str
+        arXiv ID of the positive match (to exclude)
+        
+    Returns
+    -------
+    Optional[Tuple[Dict[str, Any], Dict[str, float]]]
+        If found: (negative_arxiv_entry, similarity_scores)
+        If not found: None
+        
+    Examples
+    --------
+    >>> bib = {'normalized_title': 'neural networks learning',
+    ...        'normalized_authors': ['smith'],
+    ...        'normalized_year': '2023'}
+    >>> pool = [
+    ...     {'arxiv_id': 'pos', 'normalized_title': 'neural networks learning',
+    ...      'normalized_year': '2023'},  # Positive (excluded)
+    ...     {'arxiv_id': 'hard', 'normalized_title': 'neural networks vision',
+    ...      'normalized_year': '2023'},  # Hard negative (same year, similar title)
+    ...     {'arxiv_id': 'easy', 'normalized_title': 'quantum computing',
+    ...      'normalized_year': '2020'}   # Easy negative (nothing in common)
+    ... ]
+    >>> neg, scores = find_hard_negative(bib, pool, 'pos')
+    >>> neg['arxiv_id']
+    'hard'
+    
+    Notes
+    -----
+    Hard negatives are crucial for training robust matching models.
+    They force the model to learn subtle differences rather than just
+    obvious surface features.
+    """
+    bib_year = bib_entry.get('normalized_year', '')
+    bib_title_words = set(bib_entry.get('normalized_title', '').lower().split())
+    
+    candidates: List[Tuple[Dict[str, Any], Dict[str, float]]] = []
+    
+    for arxiv_entry in arxiv_pool:
+        arxiv_id = arxiv_entry.get('arxiv_id', '')
+        
+        # Skip the positive match
+        if arxiv_id == positive_arxiv_id:
+            continue
+        
+        # Calculate similarity
+        scores = calculate_similarity_components(bib_entry, arxiv_entry)
+        total_score = scores['total_score']
+        
+        # Hard negative criteria: some relation but low score
+        arxiv_year = arxiv_entry.get('normalized_year', '')
+        arxiv_title_words = set(arxiv_entry.get('normalized_title', '').lower().split())
+        
+        # Check if it's a hard negative
+        is_hard = False
+        
+        # Criterion 1: Same publication year
+        if bib_year and arxiv_year and bib_year == arxiv_year:
+            is_hard = True
+        
+        # Criterion 2: Title overlap (at least 2 common words, excluding stopwords)
+        common_words = bib_title_words & arxiv_title_words
+        meaningful_common = [w for w in common_words if len(w) > 3]  # Filter short words
+        if len(meaningful_common) >= 2:
+            is_hard = True
+        
+        # Only consider if score is low enough (not a false negative)
+        # Score must be < 0.5 to ensure it's truly a negative example
+        if is_hard and total_score < 0.5:
+            candidates.append((arxiv_entry, scores))
+    
+    # Return best hard negative (highest score among hard negatives)
+    # This gives us the "hardest" example that's still clearly wrong
+    if candidates:
+        candidates.sort(key=lambda x: x[1]['total_score'], reverse=True)
+        return candidates[0]
+    
+    return None
+
