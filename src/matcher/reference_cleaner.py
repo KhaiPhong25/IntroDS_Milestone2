@@ -2,15 +2,25 @@ import re
 import string
 from typing import Dict, List, Optional, Any
 
+import nltk
+from nameparser import HumanName
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+# Download NLTK data
+try:
+    nltk.data.find('corpora/stopwords')
+    nltk.data.find('corpora/wordnet')
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('stopwords')
+    nltk.download('wordnet')
+    nltk.download('omw-1.4')
+    nltk.download('punkt')
+    nltk.download('punkt_tab')
 
-# Common academic stop words (minimal impact on semantic meaning)
-STOP_WORDS = {
-    'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
-    'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
-    'to', 'was', 'will', 'with', 'we', 'our', 'their', 'this', 'these',
-    'those', 'can', 'may', 'also', 'but', 'or', 'not', 'been', 'have'
-}
-
+LEMMATIZER = WordNetLemmatizer()
+STOP_WORDS = set(stopwords.words('english'))
 
 def normalize_text(text: str, remove_stopwords: bool = True) -> str:
     """
@@ -44,7 +54,7 @@ def normalize_text(text: str, remove_stopwords: bool = True) -> str:
     >>> normalize_text("The quick brown fox", remove_stopwords=False)
     'the quick brown fox'
     """
-    if not text:
+    if not text or not isinstance(text, str):
         return ""
     
     # Step 1: Lowercase normalization
@@ -63,78 +73,21 @@ def normalize_text(text: str, remove_stopwords: bool = True) -> str:
     # Step 5: Remove all punctuation
     text = text.translate(str.maketrans('', '', string.punctuation))
     
-    # Step 6: Normalize whitespace (collapse multiple spaces)
-    text = ' '.join(text.split())
+    # Tokenize
+    tokens = word_tokenize(text)
     
-    # Step 7: Remove stop words if requested
-    if remove_stopwords:
-        words = text.split()
-        words = [w for w in words if w not in STOP_WORDS]
-        text = ' '.join(words)
-    
-    return text.strip()
+    cleaned_tokens = []
+    for token in tokens:
+        if token not in STOP_WORDS:
+            # Lemmatization
+            lemma = LEMMATIZER.lemmatize(token)
+            cleaned_tokens.append(lemma)
+
+    # Return cleaned title as a single string
+    return " ".join(cleaned_tokens)
 
 
-def normalize_author_name(author: str) -> str:
-    """
-    Normalize author name for robust matching across formats.
-    
-    Handles various citation styles:
-    - "John Smith" → "smith john"
-    - "Smith, John" → "smith john"  
-    - "J. Smith" → "smith j"
-    - "Smith, J." → "smith j"
-    - "von Neumann, John" → "von neumann john"
-    
-    Parameters
-    ----------
-    author : str
-        Author name in any common format
-        
-    Returns
-    -------
-    str
-        Normalized author name (lowercase, last-first order)
-        
-    Examples
-    --------
-    >>> normalize_author_name("John Smith")
-    'smith john'
-    
-    >>> normalize_author_name("Smith, J.")
-    'smith j'
-    
-    Notes
-    -----
-    Comma-separated formats are reordered to "last first" for consistency.
-    Periods are removed from initials (J. → j).
-    """
-    if not author:
-        return ""
-    
-    # Convert to lowercase
-    author = author.lower()
-    
-    # Remove most punctuation except comma and period
-    author = re.sub(r'[^\w\s,.]', '', author)
-    
-    # Handle "Last, First" format by reordering
-    if ',' in author:
-        parts = author.split(',')
-        if len(parts) == 2:
-            last, first = parts
-            author = f"{last.strip()} {first.strip()}"
-    
-    # Normalize whitespace
-    author = ' '.join(author.split())
-    
-    # Remove periods from initials (e.g., "j. smith" -> "j smith")
-    author = author.replace('.', '')
-    
-    return author.strip()
-
-
-def extract_author_list(author_field: str) -> List[str]:
+def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     """
     Parse BibTeX author field into normalized author list.
     
@@ -161,19 +114,47 @@ def extract_author_list(author_field: str) -> List[str]:
     ['smith j', 'doe jane']
     """
     if not author_field:
-        return []
+        return {"short_forms": [], "name_tokens": []}
     
-    # Split by 'and' keyword (case-insensitive)
-    if ' and ' in author_field.lower():
-        authors = re.split(r'\s+and\s+', author_field, flags=re.IGNORECASE)
+    authors = []
+
+    if isinstance(author_field, str):
+    # Split by 'and' (case-insensitive)
+        authors = re.split(r'\s+(?:and\s+)+', author_field, flags=re.IGNORECASE)
+    elif isinstance(author_field, list):
+        authors = author_field
     else:
-        # Fall back to comma separation
-        authors = author_field.split(',')
+        return {"short_forms": [], "name_tokens": []}
     
-    # Normalize each author and filter out empty strings
-    normalized = [normalize_author_name(a.strip()) for a in authors]
-    
-    return [a for a in normalized if a]
+    # String 1: "LastName + FirstInitial"
+    short_forms = []
+    # String 2: List of all name tokens
+    all_name_tokens = []
+
+    for auth_str in authors:
+        # Parse the name using HumanName
+        name = HumanName(auth_str)
+
+        # Create string 1: "LastName FirstInitial"
+        last_name = name.last.lower().translate(str.maketrans('', '', string.punctuation))
+        first_name = name.first.lower().translate(str.maketrans('', '', string.punctuation))
+        first_initial = first_name[0] if first_name else ""
+        
+        # Format accordingly
+        formatted_short = f"{last_name} {first_initial}".strip()
+        short_forms.append(formatted_short)
+
+        # Create string 2: all name tokens
+        tokens = [name.first, name.middle, name.last]
+        
+        # Filter out empty tokens, lowercase and remove punctuation
+        tokens = [t.lower().translate(str.maketrans('', '', string.punctuation)) for t in tokens if t]
+        all_name_tokens.append(tokens)
+
+    return {
+        "short_forms": short_forms,
+        "name_tokens": all_name_tokens
+    }
 
 
 def normalize_year(year_str: str) -> Optional[str]:
@@ -269,17 +250,14 @@ def clean_bibtex_entry(entry: Dict[str, str]) -> Dict[str, Any]:
     
     # Generate normalized fields for matching
     cleaned['normalized_title'] = normalize_text(entry.get('title', ''))
-    cleaned['normalized_authors'] = extract_author_list(entry.get('author', ''))
-    cleaned['normalized_year'] = normalize_year(entry.get('year', ''))
+    auth_details = extract_author_list(entry.get('author', ''))
     
-    # Extract first author's last name for quick filtering
-    if cleaned['normalized_authors']:
-        first_author = cleaned['normalized_authors'][0]
-        # Extract last word as last name
-        last_name = first_author.split()[-1] if first_author else ''
-        cleaned['first_author_last'] = last_name
-    else:
-        cleaned['first_author_last'] = ''
+    # Store 'short_forms' (e.g., "smith j") as the main normalized list
+    cleaned['normalized_authors'] = auth_details['short_forms']
+    # Store full tokens if you need deep matching later
+    cleaned['author_tokens'] = auth_details['name_tokens']
+
+    cleaned['normalized_year'] = normalize_year(entry.get('year', ''))
     
     return cleaned
 
@@ -331,12 +309,12 @@ def clean_arxiv_reference(ref_data: Dict[str, Any]) -> Dict[str, Any]:
     cleaned['normalized_title'] = normalize_text(ref_data.get('paper_title', ''))
     
     # Normalize author list (handle both list and string formats)
-    authors = ref_data.get('authors', [])
-    if isinstance(authors, list):
-        cleaned['normalized_authors'] = [normalize_author_name(a) for a in authors]
-    else:
-        # Handle malformed data where authors might be a string
-        cleaned['normalized_authors'] = []
+    auth_details = extract_author_list(ref_data.get('authors', []))
+    
+    # Store 'short_forms' (e.g., "smith j") as the main normalized list
+    cleaned['normalized_authors'] = auth_details['short_forms']
+    # Store full tokens if you need deep matching later
+    cleaned['author_tokens'] = auth_details['name_tokens']
     
     # Extract year from submission date (format: YYYY-MM-DD)
     date_str = ref_data.get('submission_date', '')
@@ -344,13 +322,5 @@ def clean_arxiv_reference(ref_data: Dict[str, Any]) -> Dict[str, Any]:
         cleaned['normalized_year'] = date_str[:4]
     else:
         cleaned['normalized_year'] = None
-    
-    # Extract first author's last name for filtering
-    if cleaned['normalized_authors']:
-        first_author = cleaned['normalized_authors'][0]
-        last_name = first_author.split()[-1] if first_author else ''
-        cleaned['first_author_last'] = last_name
-    else:
-        cleaned['first_author_last'] = ''
     
     return cleaned
