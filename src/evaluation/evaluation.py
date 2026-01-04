@@ -8,8 +8,8 @@ def calculate_mrr(predictions: Dict[str, List[str]],  groundtruth: Dict[str, str
     mrr_total = 0.0
     count = 0
     
-    for bib_ref_id, true_id in groundtruth.items():
-        preds = predictions.get(bib_ref_id, [])[:top_k]
+    for bib_key, true_id in groundtruth.items():
+        preds = predictions.get(bib_key, [])[:top_k]
         count += 1
         
         # Find rank of true_id in preds
