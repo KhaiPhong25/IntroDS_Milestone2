@@ -1,58 +1,56 @@
+"""
+Version Resolver
+
+Detects main LaTeX files and resolves included files for each version.
+"""
+
 import os
 import re
-from typing import Dict, List, Set, Optional, Any
+from typing import Dict, List, Optional, Set
 
 
-# Regex pattern for \input{} and \include{} commands
-INPUT_PATTERN = re.compile(r"\\(?:input|include)\{([^\}]+)\}")
+INPUT_PATTERN = re.compile(r"\\(?:input|include)(?!graphics)\s*\{?([^}\s]+)\}?")
 
 
 def _file_contains(path: str, keyword: str) -> bool:
     """
-    Check if a file contains a specific keyword.
-    
-    Fast line-by-line search without loading entire file into memory.
+    Check if a file contains a keyword (line-based, fast).
     
     Parameters
     ----------
     path : str
-        Path to file to search
+        File path to check
     keyword : str
         Keyword to search for
         
     Returns
     -------
     bool
-        True if keyword found in file, False otherwise
+        True if keyword found, False otherwise
     """
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
                 if keyword in line:
                     return True
-    except (OSError, IOError):
+    except OSError:
         pass
     return False
 
 
 def _read_file(path: str) -> str:
     """
-    Read text file with error handling.
+    Read text file safely.
     
     Parameters
     ----------
     path : str
-        Path to file to read
+        File path to read
         
     Returns
     -------
     str
-        File content as string
-        
-    Raises
-    ------
-    IOError
-        If file cannot be read
+        File content
     """
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         return f.read()
@@ -60,29 +58,23 @@ def _read_file(path: str) -> str:
 
 def detect_main_tex(version_path: str) -> Optional[str]:
     """
-    Detect the main .tex file of a multi-file LaTeX project.
-    
-    Detection strategy (in priority order):
-    1. File containing \\documentclass command (highest priority)
-    2. File containing \\begin{document} command
-    3. Largest .tex file by size (fallback heuristic)
-    
+    Detect the main .tex file of a LaTeX project.
+
+    Priority:
+    1. Contains \\documentclass
+    2. Contains \\begin{document}
+    3. Largest .tex file (fallback)
+
     Parameters
     ----------
     version_path : str
-        Path to version folder containing .tex files
-        
+        Path to a version folder.
+
     Returns
     -------
-    Optional[str]
-        Filename of main .tex file, or None if no .tex files found
-        
-    Examples
-    --------
-    >>> detect_main_tex("/path/to/version/v1")
-    'main.tex'
+    str or None
+        Filename of main .tex file, or None if not found.
     """
-    # Get all .tex files (exclude hidden files starting with .)
     tex_files = [
         f for f in os.listdir(version_path)
         if f.endswith(".tex") and not f.startswith(".")
@@ -91,19 +83,19 @@ def detect_main_tex(version_path: str) -> Optional[str]:
     if not tex_files:
         return None
 
-    # Priority 1: File with \documentclass (standard LaTeX main file)
+    # Priority 1: \documentclass
     for tex in tex_files:
         path = os.path.join(version_path, tex)
         if _file_contains(path, "\\documentclass"):
             return tex
 
-    # Priority 2: File with \begin{document}
+    # Priority 2: \begin{document}
     for tex in tex_files:
         path = os.path.join(version_path, tex)
         if _file_contains(path, "\\begin{document}"):
             return tex
 
-    # Priority 3: Largest file (heuristic - main files are usually largest)
+    # Priority 3: largest file
     tex_files.sort(
         key=lambda f: os.path.getsize(os.path.join(version_path, f)),
         reverse=True
@@ -116,142 +108,128 @@ def resolve_included_tex(
     main_tex: str
 ) -> List[str]:
     """
-    Resolve all .tex files transitively included from main file.
-    
-    Follows \\input{} and \\include{} directives recursively to build
-    the complete list of .tex files used in compilation.
-    
+    Resolve all .tex files included from the main .tex file
+    via \\input{} or \\include{}.
+
     Parameters
     ----------
     version_path : str
-        Path to version folder
+        Path to version folder.
     main_tex : str
-        Main LaTeX filename (e.g., 'main.tex')
-        
+        Main LaTeX filename.
+
     Returns
     -------
     List[str]
-        Sorted list of all .tex filenames used in compilation
-        
-    Notes
-    -----
-    - Handles both \\input{file} and \\input{file.tex}
-    - Prevents infinite loops with visited set
-    - Uses depth-first search to traverse inclusion graph
-    
-    Examples
-    --------
-    >>> resolve_included_tex("/path/to/version", "main.tex")
-    ['intro.tex', 'main.tex', 'methods.tex', 'results.tex']
+        Ordered list of used .tex filenames.
     """
+    ordered: List[str] = []
     visited: Set[str] = set()
-    stack: List[str] = [main_tex]
 
-    while stack:
-        current = stack.pop()
-        
-        # Skip if already processed
+    def _strip_comments_keep_newlines(tex: str) -> str:
+        """Remove unescaped % comments while keeping line breaks."""
+        out_lines: List[str] = []
+        for ln in tex.splitlines(keepends=True):
+            i = 0
+            cut = None
+            while True:
+                j = ln.find("%", i)
+                if j == -1:
+                    break
+                if j > 0 and ln[j - 1] == "\\":
+                    i = j + 1
+                    continue
+                cut = j
+                break
+            out_lines.append(ln if cut is None else ln[:cut] + ("\n" if ln.endswith("\n") else ""))
+        return "".join(out_lines)
+
+    def dfs(current: str) -> None:
+        """Depth-first search to resolve includes."""
         if current in visited:
-            continue
-
+            return
         visited.add(current)
+        ordered.append(current)
+
         current_path = os.path.join(version_path, current)
-
-        # Skip if file doesn't exist
         if not os.path.isfile(current_path):
-            continue
+            return
 
-        # Read file and find all \input{} and \include{} directives
-        try:
-            content = _read_file(current_path)
-        except (OSError, IOError):
-            continue
+        content = _read_file(current_path)
+        content = _strip_comments_keep_newlines(content)
 
-        # Extract included files
+        # Follow includes in the order they appear
         for match in INPUT_PATTERN.findall(content):
             tex_name = match.strip()
-            
-            # Add .tex extension if not present
+            if not tex_name:
+                continue
             if not tex_name.endswith(".tex"):
                 tex_name += ".tex"
+            
+            # Check if the file exists before recursing
+            if not os.path.isfile(os.path.join(version_path, tex_name)):
+                if tex_name.rfind('\\') > -1:
+                    tex_name = tex_name[tex_name.rfind('\\') + 1:]
+                elif tex_name.rfind('/') > -1:
+                    tex_name = tex_name[tex_name.rfind('/') + 1:]
+                if not os.path.isfile(os.path.join(version_path, tex_name)):
+                    continue
+            dfs(tex_name)
 
-            # Add to stack for processing if not visited
-            if tex_name not in visited:
-                stack.append(tex_name)
-
-    return sorted(visited)
+    dfs(main_tex)
+    return ordered
 
 
 def collect_bib_files(version_path: str) -> List[str]:
     """
-    Collect all .bib files in version folder.
-    
+    Collect .bib files inside a version folder.
+
     Parameters
     ----------
     version_path : str
         Path to version folder
-        
+
     Returns
     -------
     List[str]
-        Sorted list of .bib filenames
-        
-    Notes
-    -----
-    Excludes hidden files (starting with .)
+        Sorted list of .bib filenames.
     """
-    try:
-        return sorted(
-            f for f in os.listdir(version_path)
-            if f.endswith(".bib") and not f.startswith(".")
-        )
-    except (OSError, IOError):
-        return []
+    return sorted(
+        f for f in os.listdir(version_path)
+        if f.endswith(".bib") and not f.startswith(".")
+    )
 
 
 def resolve_version(
     publication_id: str,
     version_name: str,
     version_path: str
-) -> Dict[str, Any]:
+) -> Dict[str, object]:
     """
-    Resolve complete LaTeX file structure for a single version.
-    
-    Identifies main .tex file, resolves all included files, and collects
-    bibliography files for a specific version of a publication.
-    
+    Resolve LaTeX file structure for a single version.
+
     Parameters
     ----------
     publication_id : str
-        Publication identifier (e.g., arXiv ID)
+        Publication identifier
     version_name : str
-        Version string (e.g., 'v1', 'v2')
+        Version identifier
     version_path : str
-        Absolute path to version folder
-        
+        Path to version folder
+
     Returns
     -------
-    Dict[str, Any]
-        Resolution result with keys:
-        - publication_id: str
-        - version: str
-        - status: str ('RESOLVED' or 'NO_TEX_FILES')
-        - main_tex: Optional[str]
-        - used_tex_files: List[str]
-        - bib_files: List[str]
-        
-    Examples
-    --------
-    >>> result = resolve_version("2301.00001", "v1", "/path/to/v1")
-    >>> result['status']
-    'RESOLVED'
-    >>> result['main_tex']
-    'main.tex'
+    Dict[str, object]
+        Resolution result for the version containing:
+        - publication_id
+        - version
+        - status (NO_TEX_FILES or RESOLVED)
+        - main_tex
+        - used_tex_files
+        - bib_files
     """
-    # Detect main .tex file
     main_tex = detect_main_tex(version_path)
 
-    # Handle case: no .tex files found
     if main_tex is None:
         return {
             "publication_id": publication_id,
@@ -262,10 +240,7 @@ def resolve_version(
             "bib_files": []
         }
 
-    # Resolve all included .tex files
     used_tex_files = resolve_included_tex(version_path, main_tex)
-    
-    # Collect bibliography files
     bib_files = collect_bib_files(version_path)
 
     return {
