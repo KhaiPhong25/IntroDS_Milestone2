@@ -170,7 +170,7 @@ def feature_engineering(df):
         # Metadata
         "label",
         "pub_id",
-        "bib_ref_id",
+        "bib_key",
         "candidate_arxiv_id",
         "source",
         # Title features
