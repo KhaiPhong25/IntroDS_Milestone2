@@ -1,16 +1,7 @@
-"""
-Dataset Scanner
-
-Scans and validates the raw LaTeX dataset structure.
-"""
-
-import os
-import re
+import os, re
 from typing import Dict, List
 
-
 VERSION_PATTERN_TEMPLATE = r"^{pub_id}v\d+$"
-
 
 def scan_dataset(raw_root: str) -> Dict[str, dict]:
     """
@@ -26,16 +17,6 @@ def scan_dataset(raw_root: str) -> Dict[str, dict]:
     Dict[str, dict]
         A dictionary keyed by publication_id, containing
         metadata about dataset availability and versions.
-        
-    Notes
-    -----
-    Each entry contains:
-    - publication_id: str
-    - has_metadata: bool
-    - has_references: bool
-    - has_tex: bool
-    - versions: List[str]
-    - status: str (INVALID, NO_TEX, or READY)
     """
     dataset_info = {}
 

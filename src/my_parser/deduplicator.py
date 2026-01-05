@@ -1,44 +1,31 @@
-"""
-ID Assigner and Deduplication
-
-Handles node normalization, ID assignment, content indexing, and tree deduplication.
-"""
-
+from .file_node import *
 import hashlib
-import gc
-from typing import Dict, Optional
 from collections import defaultdict
-from .node import Node
+from typing import Dict
 
-
-_hash_cache: Optional[Dict[int, str]] = None
-
-
-def fast_normalize_and_id(root: Node, pub_id: str, version: str) -> None:
+def fast_normalize_and_id(root: FileNode, pub_id: str, version: str):
     """
     Iterative normalization and ID assignment.
-    Combines normalization and ID assignment into one pass.
-    
-    Parameters
-    ----------
-    root : Node
-        Root node to process
-    pub_id : str
-        Publication ID
-    version : str
-        Version identifier
+    Combines what used to be two separate recursive passes into one.
     """
+    # Stack stores (node)
     stack = [root]
+    # We need to assign IDs in pre-order to match the original logic's counter
     counter = 0
+    
+    # Using a list as a queue for BFS or Stack for DFS? 
+    # Original was recursive (DFS). We use a stack for DFS.
+    # To process children in order 0..N, we must push them N..0
     
     while stack:
         node = stack.pop()
         
-        # ID Assignment
+        # --- 1. ID Assignment ---
         node.id = f"{pub_id}_{version}_{counter:06d}"
         counter += 1
         
-        # Normalization Logic
+        # --- 2. Normalization Logic ---
+        # This logic mimics your original normalize_node function
         node_type = getattr(node, "node_type", None)
         
         if node_type == "sentence":
@@ -50,11 +37,9 @@ def fast_normalize_and_id(root: Node, pub_id: str, version: str) -> None:
         elif node_type in {"figure", "table"}:
             parts = []
             caption = getattr(node, "caption", None)
-            if caption: 
-                parts.append(caption.strip())
+            if caption: parts.append(caption.strip())
             label = getattr(node, "label", None)
-            if label: 
-                parts.append(label.strip())
+            if label: parts.append(label.strip())
             
             if not parts:
                 raw = getattr(node, "content", "") or ""
@@ -70,32 +55,14 @@ def fast_normalize_and_id(root: Node, pub_id: str, version: str) -> None:
         else:
             node.full_text = ""
 
-        # Add children to stack in reverse order
+        # Add children to stack in reverse order so they are popped in original order
         if hasattr(node, "children") and node.children:
             stack.extend(reversed(node.children))
 
-
-def build_content_index(root: Node, using_sha256: bool = False) -> Dict:
+def build_content_index(root: FileNode, using_SHA256: bool = False):
     """
-    Build content index using fast built-in hashing or SHA256.
-    
-    Parameters
-    ----------
-    root : Node
-        Root node to index
-    using_sha256 : bool
-        If True, use SHA256 hashing; otherwise use built-in hash
-        
-    Returns
-    -------
-    Dict
-        Content index mapping hashes to lists of nodes
+    Builds the content index using fast built-in hashing or SHA256 hashing.
     """
-    global _hash_cache
-    
-    if using_sha256 and _hash_cache is None:
-        _hash_cache = {}
-    
     index = defaultdict(list)
     stack = [root]
     
@@ -103,13 +70,12 @@ def build_content_index(root: Node, using_sha256: bool = False) -> Dict:
         node = stack.pop()
         
         if hasattr(node, "full_text") and node.full_text:
-            if using_sha256:
-                node_id = id(node)
-                if node_id not in _hash_cache:
-                    _hash_cache[node_id] = hashlib.sha256(
-                        node.full_text.encode("utf-8")
-                    ).hexdigest()
-                h = _hash_cache[node_id]
+            # Quick hash: Python built-in hashing Non-cryptographic (SipHash-2-4)
+            # One-to-one hash: SHA256
+            if using_SHA256:
+                h = hashlib.sha256(
+                    node.full_text.encode("utf-8")
+                ).hexdigest()
             else:
                 h = hash(node.full_text)
             index[h].append(node)
@@ -119,27 +85,12 @@ def build_content_index(root: Node, using_sha256: bool = False) -> Dict:
             
     return index
 
-
-def deduplicate_tree(source_root: Node, content_index: Dict, using_sha256: bool = False) -> None:
+def deduplicate_tree(source_root: FileNode, content_index: Dict, using_SHA256: bool = False):
     """
     Iterative deduplication.
     Traverses source_root; if a node matches one in content_index, 
-    swaps it in the parent's children list.
-    
-    Parameters
-    ----------
-    source_root : Node
-        Root of tree to deduplicate
-    content_index : Dict
-        Content index from build_content_index
-    using_sha256 : bool
-        If True, use SHA256 hashing; otherwise use built-in hash
+    swaps it in the parent's children list and stops traversing that branch.
     """
-    global _hash_cache
-    
-    if using_sha256 and _hash_cache is None:
-        _hash_cache = {}
-    
     # Stack stores: (node, parent_node, index_in_parent_children)
     stack = [(source_root, None, -1)]
     
@@ -148,13 +99,10 @@ def deduplicate_tree(source_root: Node, content_index: Dict, using_sha256: bool 
         
         # Only try to deduplicate if it has content
         if hasattr(node, "full_text") and node.full_text:
-            if using_sha256:
-                node_id = id(node)
-                if node_id not in _hash_cache:
-                    _hash_cache[node_id] = hashlib.sha256(
-                        node.full_text.encode("utf-8")
-                    ).hexdigest()
-                h = _hash_cache[node_id]
+            if using_SHA256:
+                h = hashlib.sha256(
+                    node.full_text.encode("utf-8")
+                ).hexdigest()
             else:
                 h = hash(node.full_text)
             
@@ -163,6 +111,7 @@ def deduplicate_tree(source_root: Node, content_index: Dict, using_sha256: bool 
                 found = None
                 
                 # Collision check: explicit string comparison
+                # This ensures accuracy despite using non-crypto hash
                 for cand in candidates:
                     if cand.full_text == node.full_text:
                         found = cand
@@ -174,21 +123,15 @@ def deduplicate_tree(source_root: Node, content_index: Dict, using_sha256: bool 
                         parent.children[idx] = found
                     
                     # CRITICAL: Do not traverse children of a replaced node.
+                    # The 'found' node (from base tree) already has its structure.
                     continue
             
-            # If not found, index it
+            # If not found (or no content), we index it (canonicalize this version's unique nodes)
+            # This handles intra-version duplicates or helps future versions match this unique node
             content_index[h].append(node)
 
         # Push children to stack
         if hasattr(node, "children") and node.children:
+            # Push in reverse order
             for i in range(len(node.children) - 1, -1, -1):
                 stack.append((node.children[i], node, i))
-
-
-def clear_hash_cache() -> None:
-    """Clear the global hash cache to free memory."""
-    global _hash_cache
-    if _hash_cache is not None:
-        _hash_cache.clear()
-        _hash_cache = None
-    gc.collect()
