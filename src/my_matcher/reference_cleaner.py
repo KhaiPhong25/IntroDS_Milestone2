@@ -102,16 +102,18 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
         
     Returns
     -------
-    List[str]
-        List of normalized author names (empty names filtered out)
+    Dict[str, List[str]]
+        Dictionary containing:
+        - 'short_forms': List of "LastName FirstInitial" strings
+        - 'name_tokens': List of lists containing all name tokens
         
     Examples
     --------
     >>> extract_author_list("John Smith and Jane Doe")
-    ['smith john', 'doe jane']
+    {'short_forms': ['smith j', 'doe j'], 'name_tokens': [['john', 'smith'], ['jane', 'doe']]}
     
     >>> extract_author_list("Smith, J. and Doe, Jane")
-    ['smith j', 'doe jane']
+    {'short_forms': ['smith j', 'doe j'], 'name_tokens': [['j', 'smith'], ['jane', 'doe']]}
     """
     if not author_field:
         return {"short_forms": [], "name_tokens": []}
@@ -119,7 +121,7 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     authors = []
 
     if isinstance(author_field, str):
-    # Split by 'and' (case-insensitive)
+        # Split by 'and' (case-insensitive)
         authors = re.split(r'\s+(?:and\s+)+', author_field, flags=re.IGNORECASE)
     elif isinstance(author_field, list):
         authors = author_field
@@ -142,14 +144,16 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
         
         # Format accordingly
         formatted_short = f"{last_name} {first_initial}".strip()
-        short_forms.append(formatted_short)
+        if formatted_short:  # Only append non-empty names
+            short_forms.append(formatted_short)
 
         # Create string 2: all name tokens
         tokens = [name.first, name.middle, name.last]
         
         # Filter out empty tokens, lowercase and remove punctuation
         tokens = [t.lower().translate(str.maketrans('', '', string.punctuation)) for t in tokens if t]
-        all_name_tokens.append(tokens)
+        if tokens:  # Only append non-empty token lists
+            all_name_tokens.append(tokens)
 
     return {
         "short_forms": short_forms,

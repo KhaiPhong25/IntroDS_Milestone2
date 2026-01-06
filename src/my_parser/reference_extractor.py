@@ -3,9 +3,100 @@ import os
 from typing import List, Dict, Optional
 
 
+def _extract_balanced_braces(text: str, start_pos: int) -> tuple:
+    """
+    Extract content within balanced braces starting from start_pos.
+    
+    Parameters
+    ----------
+    text : str
+        The text to parse
+    start_pos : int
+        Position of opening brace '{'
+        
+    Returns
+    -------
+    tuple
+        (content_inside_braces, end_position) or (None, -1) if not balanced
+    """
+    if start_pos >= len(text) or text[start_pos] != '{':
+        return None, -1
+    
+    depth = 0
+    content_start = start_pos + 1
+    
+    for i in range(start_pos, len(text)):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return text[content_start:i], i
+    
+    return None, -1
+
+
+def _extract_field_value(text: str, field_start: int) -> tuple:
+    """
+    Extract field value after '=' sign, handling braces, quotes, and bare values.
+    
+    Parameters
+    ----------
+    text : str
+        The text containing the field
+    field_start : int
+        Position right after '=' sign
+        
+    Returns
+    -------
+    tuple
+        (field_value, end_position) or (None, -1) if extraction fails
+    """
+    # Skip whitespace
+    pos = field_start
+    while pos < len(text) and text[pos] in ' \t\n\r':
+        pos += 1
+    
+    if pos >= len(text):
+        return None, -1
+    
+    # Case 1: Value in braces { ... }
+    if text[pos] == '{':
+        return _extract_balanced_braces(text, pos)
+    
+    # Case 2: Value in quotes " ... "
+    if text[pos] == '"':
+        end_quote = text.find('"', pos + 1)
+        if end_quote != -1:
+            return text[pos + 1:end_quote], end_quote
+        return None, -1
+    
+    # Case 3: Bare value (number, month name, or string concatenation)
+    # Read until comma, newline, or closing brace of entry
+    value_chars = []
+    while pos < len(text):
+        char = text[pos]
+        if char in ',\n}':
+            break
+        value_chars.append(char)
+        pos += 1
+    
+    value = ''.join(value_chars).strip()
+    if value:
+        return value, pos - 1
+    
+    return None, -1
+
+
 def parse_bibtex_file(bib_file_path: str) -> List[Dict[str, str]]:
     """
     Parse a .bib file and extract BibTeX entries.
+    
+    Handles:
+    - Nested braces in author/title fields (e.g., {{LastName}, FirstName})
+    - Bare values without braces (e.g., year = 2017)
+    - Quoted values (e.g., title = "Some Title")
+    - Multi-line field values
     
     Parameters
     ----------
@@ -28,25 +119,23 @@ def parse_bibtex_file(bib_file_path: str) -> List[Dict[str, str]]:
     
     entries = []
     
-    # Pattern to match @type{key, ...fields... }
-    # Handles nested braces
-    entry_pattern = r'@(\w+)\s*\{\s*([^,]+)\s*,'
+    # Find all entry starts: @type{key,
+    entry_starts = list(re.finditer(r'@(\w+)\s*\{\s*([^,\s]+)\s*,', content))
     
-    # Split by @ to get individual entries
-    parts = content.split('@')
-    
-    for part in parts[1:]:  # Skip first empty part
-        part = '@' + part
-        
-        # Extract entry type and key
-        match = re.match(r'@(\w+)\s*\{\s*([^,]+)\s*,', part)
-        if not match:
-            continue
-        
+    for idx, match in enumerate(entry_starts):
         entry_type = match.group(1).lower()
         cite_key = match.group(2).strip()
         
-        # Extract fields
+        # Determine entry boundaries
+        entry_start = match.start()
+        if idx + 1 < len(entry_starts):
+            entry_end = entry_starts[idx + 1].start()
+        else:
+            entry_end = len(content)
+        
+        entry_text = content[entry_start:entry_end]
+        
+        # Initialize entry with default empty values
         entry = {
             'type': entry_type,
             'key': cite_key,
@@ -59,18 +148,34 @@ def parse_bibtex_file(bib_file_path: str) -> List[Dict[str, str]]:
             'number': '',
             'pages': '',
             'publisher': '',
-            'raw': part
+            'eprint': '',
+            'doi': '',
+            'raw': entry_text
         }
         
-        # Extract field values using regex
-        field_pattern = r'(\w+)\s*=\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}'
+        # Find all field assignments: fieldname = value
+        field_pattern = r'(\w+)\s*='
         
-        for field_match in re.finditer(field_pattern, part):
+        for field_match in re.finditer(field_pattern, entry_text):
             field_name = field_match.group(1).lower()
-            field_value = field_match.group(2).strip()
             
-            if field_name in entry:
-                entry[field_name] = field_value
+            # Skip if not a field we care about
+            if field_name not in entry:
+                continue
+            
+            # Position right after '='
+            eq_pos = field_match.end()
+            
+            # Extract the field value
+            value, end_pos = _extract_field_value(entry_text, eq_pos)
+            
+            if value is not None:
+                # Clean up the value: remove outer quotes/braces if present
+                value = value.strip()
+                # Remove surrounding quotes if any
+                if value.startswith('"') and value.endswith('"'):
+                    value = value[1:-1]
+                entry[field_name] = value
         
         entries.append(entry)
     
