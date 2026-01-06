@@ -1,22 +1,10 @@
 import re
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict
+from collections import defaultdict
 
 
 def parse_bibtex_file(bib_file_path: str) -> List[Dict[str, str]]:
-    """
-    Parse a .bib file and extract BibTeX entries.
-    
-    Parameters
-    ----------
-    bib_file_path : str
-        Path to .bib file
-        
-    Returns
-    -------
-    List[Dict[str, str]]
-        List of reference entries with extracted fields
-    """
     if not os.path.exists(bib_file_path):
         return []
     
@@ -25,55 +13,117 @@ def parse_bibtex_file(bib_file_path: str) -> List[Dict[str, str]]:
             content = f.read()
     except:
         return []
-    
+
     entries = []
     
-    # Pattern to match @type{key, ...fields... }
-    # Handles nested braces
-    entry_pattern = r'@(\w+)\s*\{\s*([^,]+)\s*,'
+    # 1. Split entries (giữ nguyên logic split thông minh)
+    parts = re.split(r'\n@|(?<=^@)', content)
     
-    # Split by @ to get individual entries
-    parts = content.split('@')
-    
-    for part in parts[1:]:  # Skip first empty part
-        part = '@' + part
+    for part in parts:
+        if not part.strip(): continue
+        if not part.startswith('@'): part = '@' + part
+            
+        # 2. Extract Header: @Type{Key,
+        header_match = re.match(r'@(\w+)\s*\{\s*([^,]+)\s*,', part)
+        if not header_match: continue
         
-        # Extract entry type and key
-        match = re.match(r'@(\w+)\s*\{\s*([^,]+)\s*,', part)
-        if not match:
-            continue
-        
-        entry_type = match.group(1).lower()
-        cite_key = match.group(2).strip()
-        
-        # Extract fields
         entry = {
-            'type': entry_type,
-            'key': cite_key,
-            'author': '',
-            'title': '',
-            'journal': '',
-            'booktitle': '',
-            'year': '',
-            'volume': '',
-            'number': '',
-            'pages': '',
-            'publisher': '',
+            'type': header_match.group(1).lower(),
+            'key': header_match.group(2).strip(),
             'raw': part
         }
         
-        # Extract field values using regex
-        field_pattern = r'(\w+)\s*=\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}'
+        # 3. Quét từng ký tự để tìm Fields (Thay thế Regex)
+        # Bắt đầu quét từ sau phần Header
+        cursor = header_match.end()
+        n = len(part)
         
-        for field_match in re.finditer(field_pattern, part):
-            field_name = field_match.group(1).lower()
-            field_value = field_match.group(2).strip()
+        while cursor < n:
+            # Tìm tên Field (vd: title =)
+            # Regex tìm: từ khóa + dấu bằng
+            field_match = re.search(r'(\w+)\s*=', part[cursor:])
+            if not field_match: 
+                break # Không còn field nào nữa
             
-            if field_name in entry:
-                entry[field_name] = field_value
-        
+            field_name = field_match.group(1).lower()
+            
+            # Di chuyển con trỏ đến sau dấu bằng
+            # start() là vị trí tương đối so với part[cursor:]
+            # cursor mới = cursor cũ + vị trí match + độ dài match
+            value_start_pos = cursor + field_match.end()
+            
+            # Bỏ qua khoảng trắng sau dấu bằng
+            while value_start_pos < n and part[value_start_pos].isspace():
+                value_start_pos += 1
+            
+            if value_start_pos >= n: break
+            
+            # --- LOGIC ĐỌC GIÁ TRỊ (BRACE COUNTING) ---
+            char = part[value_start_pos]
+            extracted_value = ""
+            new_cursor = value_start_pos
+            
+            if char == '{': 
+                # Trường hợp dùng ngoặc nhọn: { ... }
+                # Đếm ngoặc để lấy đúng nội dung, bất kể lồng nhau bao nhiêu cấp
+                brace_count = 0
+                idx = value_start_pos
+                content_start = idx + 1
+                
+                while idx < n:
+                    if part[idx] == '{':
+                        brace_count += 1
+                    elif part[idx] == '}':
+                        brace_count -= 1
+                        
+                    if brace_count == 0:
+                        # Đã đóng ngoặc cuối cùng
+                        extracted_value = part[content_start:idx] # Lấy nội dung bên trong
+                        new_cursor = idx + 1 # Di chuyển ra sau dấu }
+                        break
+                    idx += 1
+                    
+            elif char == '"':
+                # Trường hợp dùng ngoặc kép: " ... "
+                idx = value_start_pos + 1
+                content_start = idx
+                while idx < n:
+                    # Tìm dấu " tiếp theo (lưu ý: bibtex ít khi escape \" bằng \", nhưng nếu có thì cần xử lý thêm.
+                    # Ở đây giả định format chuẩn là đóng bằng " )
+                    if part[idx] == '"':
+                        extracted_value = part[content_start:idx]
+                        new_cursor = idx + 1
+                        break
+                    idx += 1
+            
+            elif char.isdigit():
+                # Trường hợp số: 2014
+                idx = value_start_pos
+                while idx < n and part[idx].isdigit():
+                    idx += 1
+                extracted_value = part[value_start_pos:idx]
+                new_cursor = idx
+            
+            else:
+                # Trường hợp lỗi hoặc format lạ -> Skip đến dấu phẩy hoặc }
+                idx = value_start_pos
+                while idx < n and part[idx] not in [',', '}']:
+                    idx += 1
+                extracted_value = part[value_start_pos:idx]
+                new_cursor = idx
+
+            # Lưu giá trị tìm được
+            entry[field_name] = re.sub(r'\s+', ' ', extracted_value).strip()
+            
+            # Cập nhật con trỏ chính để tìm field tiếp theo
+            cursor = new_cursor
+            
+            # Bỏ qua dấu phẩy hoặc khoảng trắng để chuẩn bị cho vòng lặp sau
+            while cursor < n and part[cursor] in [',', ' ', '\n', '\r', '\t']:
+                cursor += 1
+
         entries.append(entry)
-    
+            
     return entries
 
 
@@ -334,52 +384,73 @@ def extract_references_from_tex_files(version_path: str, tex_files: List[str]) -
 
 
 def deduplicate_references(references: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """
-    Deduplicate reference entries across versions.
-    
-    Two references are considered duplicates if they have:
-    - Same title (case-insensitive)
-    - Same year
-    - Same first author (or very similar)
-    
-    Parameters
-    ----------
-    references : List[Dict[str, str]]
-        List of reference entries
-        
-    Returns
-    -------
-    List[Dict[str, str]]
-        Deduplicated list of references
-    """
-    seen = {}
-    deduplicated = []
+    groups = defaultdict(list)
     
     for ref in references:
-        # Create a normalized key for matching
-        title = ref.get('title', '').lower().strip()
-        year = ref.get('year', '').strip()
+        # Chuẩn hóa Author lấy Lastname
         author = ref.get('author', '').lower().strip()
-        
-        # Extract first author's last name
         first_author = ''
         if author:
-            # Split by 'and' or comma
+            # Tách dấu phẩy hoặc chữ 'and'
             authors = re.split(r'\s+and\s+|,', author)
             if authors:
-                first_author = authors[0].strip().split()[-1] if authors[0].strip() else ''
+                first_author = authors[0].strip().split()[-1] 
         
-        # Create unique key
-        unique_key = f"{first_author}_{year}_{title[:50]}"
+        # Chuẩn hóa Year
+        year = ref.get('year', '').strip()
         
-        if unique_key not in seen:
-            seen[unique_key] = ref
-            deduplicated.append(ref)
-        else:
-            # Merge fields if new ref has more information
-            existing = seen[unique_key]
-            for field in ['author', 'title', 'journal', 'volume', 'number', 'pages']:
-                if not existing.get(field) and ref.get(field):
-                    existing[field] = ref[field]
+        # Bỏ qua nếu thiếu cả Author và Year (rác)
+        if not first_author and not year:
+            continue
+            
+        # Key gom nhóm chỉ dựa trên Author và Year (không dùng Title ở đây)
+        key = (first_author, year)
+        groups[key].append(ref)
     
+    deduplicated = []
+    
+    # Bước B: Xử lý từng nhóm để merge
+    for key, refs in groups.items():
+        # Nếu nhóm chỉ có 1 bài -> Lấy luôn
+        if len(refs) == 1:
+            deduplicated.append(refs[0])
+            continue
+            
+        # Sắp xếp: Bài nào Title dài nhất (đầy đủ nhất) lên đầu
+        refs.sort(key=lambda x: len(x.get('title', '') or ''), reverse=True)
+        
+        unique_in_group = []
+        
+        for ref in refs:
+            is_merged = False
+            ref_title = ref.get('title', '').strip().lower()
+            
+            for existing in unique_in_group:
+                exist_title = existing.get('title', '').strip().lower()
+                
+                # LOGIC QUAN TRỌNG: Merge khi nào?
+                should_merge = False
+                
+                # 1. Nếu một trong hai bên bị mất Title -> GỘP LUÔN (Đây là chỗ sửa lỗi của bạn)
+                if not ref_title or not exist_title:
+                    should_merge = True 
+                # 2. Hoặc Title chứa nhau (trùng lặp)
+                elif ref_title in exist_title or exist_title in ref_title:
+                    should_merge = True
+                
+                if should_merge:
+                    # Merge thông tin: Ưu tiên lấy field nào có dữ liệu
+                    for field in ['author', 'title', 'journal', 'volume', 'number', 'pages', 'booktitle', 'publisher']:
+                        # Nếu bản gốc thiếu mà bản mới có -> Bù vào
+                        if not existing.get(field) and ref.get(field):
+                            existing[field] = ref[field]
+                    
+                    is_merged = True
+                    break
+            
+            if not is_merged:
+                unique_in_group.append(ref)
+        
+        deduplicated.extend(unique_in_group)
+            
     return deduplicated
