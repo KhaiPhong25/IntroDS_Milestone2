@@ -113,11 +113,13 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
         
         # Format: "cyr-racine f"
         formatted_short = f"{last_name} {first_initial}".strip()
-        short_forms.append(formatted_short)
+        if formatted_short:  # Only append non-empty names
+            short_forms.append(formatted_short)
 
-        # Token list: Cũng áp dụng logic giữ gạch nối
-        raw_tokens = [name.first, name.middle, name.last]
-        tokens = [clean_name_part(t) for t in raw_tokens if t]
+    raw_tokens = [name.first, name.middle, name.last]
+    tokens = [clean_name_part(t) for t in raw_tokens if t]
+    tokens = [t for t in tokens if t]
+    if tokens:
         all_name_tokens.append(tokens)
 
     return {
