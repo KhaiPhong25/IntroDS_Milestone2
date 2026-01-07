@@ -141,223 +141,136 @@ def extract_bibitems(tex_content: str) -> List[Dict[str, str]]:
 
 
 def parse_bibitem_to_bibtex(bibitem: Dict[str, str]) -> Dict[str, str]:
-    """
-    Parse a bibitem entry and convert to BibTeX-like structure.
-    
-    Attempts to extract:
-    - authors
-    - title
-    - journal/booktitle
-    - year
-    - volume, number, pages
-    - publisher, etc.
-    
-    Parameters
-    ----------
-    bibitem : Dict[str, str]
-        Bibitem dictionary from extract_bibitems()
-        
-    Returns
-    -------
-    Dict[str, str]
-        BibTeX entry with extracted fields
-    """
-    content = bibitem['raw_content']
-    cite_key = bibitem['key']
+    content = bibitem.get('raw_content', '')
+    cite_key = bibitem.get('key', 'unknown')
     
     bibtex_entry = {
-        'type': 'article',  # Default type
+        'type': 'misc',
         'key': cite_key,
         'author': '',
         'title': '',
-        'journal': '',
         'year': '',
-        'volume': '',
-        'number': '',
         'pages': '',
         'publisher': '',
-        'booktitle': '',
+        'journal': '',
         'raw': content
     }
-    
-    # Remove LaTeX commands for easier parsing
-    clean_content = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', content)
-    clean_content = re.sub(r'\\[a-zA-Z]+', '', clean_content)
-    clean_content = re.sub(r'[{}]', '', clean_content)
-    
-    # Extract year (4 digits)
-    year_match = re.search(r'\b(19|20)\d{2}\b', clean_content)
+
+    year_match = re.search(r'\(?((?:19|20)\d{2})\)?', content)
+    found_year = ''
     if year_match:
-        bibtex_entry['year'] = year_match.group(0)
+        found_year = year_match.group(1)
+        bibtex_entry['year'] = found_year
     
-    # Extract title (usually in quotes or \emph{})
+    clean_content = content
+    
+    if found_year:
+        clean_content = clean_content.replace(found_year, '')
+
+    title_found = False
+    
     title_patterns = [
-        r'["""]([^"""]+)["""]',  # Quoted title
-        r'\\emph\{([^}]+)\}',     # Emphasized title
-        r'\\textit\{([^}]+)\}'    # Italic title
+        r'\\textit\{((?:[^{}]|\\{[^{}]*\\})*)\}', 
+        r'\\emph\{((?:[^{}]|\\{[^{}]*\\})*)\}',   
+        r'["“]([^"”]+)["”]',                       
+        r"''([^']+)''"                             
     ]
     
     for pattern in title_patterns:
-        title_match = re.search(pattern, content)
-        if title_match:
-            bibtex_entry['title'] = title_match.group(1).strip()
+        match = re.search(pattern, content)
+        if match:
+            raw_title = match.group(1)
+            clean_title = raw_title.strip()
+            
+            bibtex_entry['title'] = clean_title
+            title_found = True
+            
+            clean_content = content.replace(match.group(0), ',') 
             break
-    
-    # Extract pages (e.g., pp. 123-456, pages 123--456)
-    pages_match = re.search(r'(?:pp?\.|pages?)\s*(\d+)\s*[-–—]+\s*(\d+)', clean_content, re.IGNORECASE)
+            
+    pages_match = re.search(r'(?:pp\.?|pages?)\s*(\d+)\s*[-–—]+\s*(\d+)', clean_content, re.IGNORECASE)
+    if not pages_match: 
+        pages_match = re.search(r'\b(\d{2,})\s*[-–—]+\s*(\d{2,})\b', clean_content)
+        
     if pages_match:
         bibtex_entry['pages'] = f"{pages_match.group(1)}--{pages_match.group(2)}"
+        clean_content = clean_content.replace(pages_match.group(0), '')
+
+    clean_content = re.sub(r'\\cite\{[^}]+\}', '', clean_content)
+    clean_content = re.sub(r'\[[^\]]+\]', '', clean_content) 
+    clean_content = re.sub(r'\(\s*\)', '', clean_content)    
     
-    # Extract volume and number (e.g., vol. 12, no. 3)
-    volume_match = re.search(r'(?:vol\.?|volume)\s*(\d+)', clean_content, re.IGNORECASE)
-    if volume_match:
-        bibtex_entry['volume'] = volume_match.group(1)
-    
-    number_match = re.search(r'(?:no\.?|number)\s*(\d+)', clean_content, re.IGNORECASE)
-    if number_match:
-        bibtex_entry['number'] = number_match.group(1)
-    
-    # Try to extract author (usually at the beginning, before title or year)
-    # Authors are often separated by "and" or commas
-    content_before_title = content
-    if bibtex_entry['title']:
-        title_pos = content.find(bibtex_entry['title'])
-        if title_pos > 0:
-            content_before_title = content[:title_pos]
-    
-    # Clean and extract potential author names
-    author_text = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', content_before_title)
-    author_text = re.sub(r'\\[a-zA-Z]+', '', author_text)
-    author_text = author_text.strip().rstrip('.,;:')
-    
-    if author_text and len(author_text) < 200:  # Sanity check
-        bibtex_entry['author'] = author_text.strip()
-    
-    # Detect entry type based on keywords
-    lower_content = clean_content.lower()
-    if any(word in lower_content for word in ['proceedings', 'conference', 'workshop']):
-        bibtex_entry['type'] = 'inproceedings'
-    elif any(word in lower_content for word in ['book', 'publisher', 'edition']):
-        bibtex_entry['type'] = 'book'
-    elif 'thesis' in lower_content or 'dissertation' in lower_content:
-        bibtex_entry['type'] = 'phdthesis'
-    elif 'technical report' in lower_content or 'tech. rep.' in lower_content:
-        bibtex_entry['type'] = 'techreport'
-    
+    parts = [p.strip() for p in clean_content.split(',')]
+    parts = [p for p in parts if p and p not in ['.', ';']] 
+
+    if title_found:
+        if parts:
+            candidate_author = parts[0]
+            if len(candidate_author) < 100:
+                bibtex_entry['author'] = candidate_author
+                
+            if len(parts) > 1:
+                remaining = parts[1:]
+                pub_text = ', '.join(remaining).strip(' .,;')
+                if any(k in pub_text for k in ['Springer', 'Proc', 'Press', 'Wiley']):
+                    bibtex_entry['publisher'] = pub_text
+                    if not bibtex_entry['type'] or bibtex_entry['type'] == 'misc':
+                         bibtex_entry['type'] = 'book' 
+                else:
+                    bibtex_entry['journal'] = pub_text
+                    if not bibtex_entry['type'] or bibtex_entry['type'] == 'misc':
+                         bibtex_entry['type'] = 'article'
+
+    else:
+        
+        if len(parts) >= 1:
+             bibtex_entry['author'] = parts[0]
+             
+        if len(parts) >= 2:
+            bibtex_entry['title'] = parts[1]
+            
+        if len(parts) >= 3:
+            bibtex_entry['publisher'] = ', '.join(parts[2:])
+
+    for k, v in bibtex_entry.items():
+        if k != 'raw' and v:
+            v = v.strip(' .,;')
+            if k == 'author':
+                v = v.replace('{', '').replace('}', '') 
+            bibtex_entry[k] = v
+
     return bibtex_entry
 
 
-def format_bibtex_entry(entry: Dict[str, str]) -> str:
-    """
-    Format a parsed entry as a BibTeX string.
-    
-    Parameters
-    ----------
-    entry : Dict[str, str]
-        Parsed BibTeX entry
-        
-    Returns
-    -------
-    str
-        Formatted BibTeX entry
-    """
-    entry_type = entry['type']
-    cite_key = entry['key']
-    
-    lines = [f"@{entry_type}{{{cite_key},"]
-    
-    # Add fields in standard order
-    field_order = ['author', 'title', 'journal', 'booktitle', 'year', 
-                   'volume', 'number', 'pages', 'publisher']
-    
-    for field in field_order:
-        value = entry.get(field, '').strip()
-        if value:
-            lines.append(f"  {field} = {{{value}}},")
-    
-    lines.append("}")
-    
-    return "\n".join(lines)
-
-
 def extract_references_from_tex_files(version_path: str, tex_files: List[str]) -> List[Dict[str, str]]:
-    """
-    Extract all bibliography entries from a list of .tex files.
+    all_references = []
     
-    Parameters
-    ----------
-    version_path : str
-        Path to version folder
-    tex_files : List[str]
-        List of .tex files to scan
-        
-    Returns
-    -------
-    List[Dict[str, str]]
-        List of extracted BibTeX entries
-    """  
+    bib_files = [f for f in os.listdir(version_path) if f.endswith('.bib')]
     
-    all_entries = []
+    if bib_files:
+        for bib_file in bib_files:
+            bib_path = os.path.join(version_path, bib_file)
+            refs = parse_bibtex_file(bib_path)
+            all_references.extend(refs)
     
-    for tex_file in tex_files:
-        tex_path = os.path.join(version_path, tex_file)
-        
-        if not os.path.isfile(tex_path):
-            continue
-        
-        try:
-            with open(tex_path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            
-            # Check if file contains bibliography
-            if '\\begin{thebibliography}' in content or '\\bibitem' in content:
-                # Extract bibliography section
-                bib_match = re.search(
-                    r'\\begin\{thebibliography\}.*?\\end\{thebibliography\}',
-                    content,
-                    re.DOTALL
-                )
-                
-                if bib_match:
-                    bib_content = bib_match.group(0)
-                else:
-                    # If no environment found, try to extract bibitems anyway
-                    bib_content = content
-                
-                # Extract bibitems
-                bibitems = extract_bibitems(bib_content)
-                
-                # Convert to BibTeX
-                for bibitem in bibitems:
-                    bibtex_entry = parse_bibitem_to_bibtex(bibitem)
-                    all_entries.append(bibtex_entry)
-            
-            # Check for \bibliography{filename} command
-            bib_pattern = r'\\bibliography\{([^}]+)\}'
-            bib_matches = re.findall(bib_pattern, content)
-            
-            for bib_name in bib_matches:
-                # Construct path to .bib file
-                tex_dir = os.path.dirname(tex_path)
-                bib_file = os.path.join(tex_dir, bib_name.strip())
-                
-                # Try with .bib extension if not present
-                if not bib_file.endswith('.bib'):
-                    bib_file += '.bib'
-                
-                # Parse .bib file
-                if os.path.exists(bib_file):
-                    print(f"[INFO] Parsing .bib file: {bib_file}")
-                    bib_entries = parse_bibtex_file(bib_file)
-                    all_entries.extend(bib_entries)
-                else:
-                    print(f"[WARN] Bibliography file not found: {bib_file}")
-        
-        except Exception as e:
-            print(f"[WARN] Error extracting references from {tex_file}: {e}")
-            continue
-    
-    return all_entries
+    if len(all_references) < 5:
+        for tex_file in tex_files:
+            tex_path = os.path.join(version_path, tex_file)
+            if os.path.exists(tex_path):
+                try:
+                    with open(tex_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    
+                    bibitems = extract_bibitems(content)
+                    
+                    for item in bibitems:
+                        parsed_entry = parse_bibitem_to_bibtex(item)
+                        all_references.append(parsed_entry)
+                        
+                except Exception:
+                    continue
+                    
+    return all_references
 
 
 def deduplicate_references_with_mapping(references: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], Dict[str, str]]:
@@ -366,10 +279,15 @@ def deduplicate_references_with_mapping(references: List[Dict[str, str]]) -> Tup
     for ref in references:
         author = ref.get('author', '').lower().strip()
         first_author = ''
-        if author:
 
+        if author:
             authors = re.split(r'\s+and\s+|,', author)
-            if authors: first_author = authors[0].strip().split()[-1] 
+
+            if authors: 
+                author_parts = authors[0].strip().split()
+                
+                if author_parts:
+                    first_author = author_parts[-1]
         
         if not first_author: continue
             
@@ -434,3 +352,38 @@ def deduplicate_references_with_mapping(references: List[Dict[str, str]]) -> Tup
         deduplicated.extend(unique_in_group)
             
     return deduplicated, key_mapping
+
+
+def export_to_bibtex(entry: dict) -> str:
+    entry_type = entry.get('type', 'misc').strip()
+    entry_key = entry.get('key', 'unknown').strip()
+    
+    bib_str = f"@{entry_type}{{{entry_key},\n"
+    
+    internal_fields = [
+        'type', 'key',                  
+        'ref_id', 'all_keys',           
+        'raw', 'source',                
+        'normalized_title', 'normalized_authors', 'normalized_year', 
+        'author_tokens', 'title_tokens', 
+        'similarity_score', 'label', 'pair_type' 
+    ]
+    
+    priority_order = ['author', 'title', 'journal', 'booktitle', 'volume', 'number', 'pages', 'year', 'publisher', 'doi']
+    
+    for field in priority_order:
+        if field in entry and entry[field]:
+            val = str(entry[field]).strip()
+            bib_str += f"  {field}={{{val}}},\n"
+            
+    for field, val in entry.items():
+        if field in internal_fields or field in priority_order:
+            continue
+            
+        if val:
+            val_str = str(val).strip()
+            bib_str += f"  {field}={{{val_str}}},\n"
+            
+    bib_str += "}\n\n"
+    
+    return bib_str
