@@ -5,7 +5,7 @@
 ### Prerequisites
 
 - **Python 3.8+**
-- **RAM:** 8GB+ recommended.
+- **RAM:** 16GB+ recommended.
 
 ### Installation
 
