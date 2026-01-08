@@ -12,18 +12,36 @@ def parse_plain_tex(
     file_map: Dict[str, str],
     main_tex: str,
 ) -> FileNode:
-    # Matches \Title{ReportNum}{Actual Title} - handles multiline titles common in Harvmac
-    _HARVMAC_TITLE_RE = re.compile(r"\\Title\s*\{.*?\}\s*\{\s*(?:\\centerline\s*\{)?(.*?)\}\s*", re.DOTALL)
-    _HARVMAC_NEWSEC_RE = re.compile(r"\\newsec\s*\{([^}]+)\}")
+    _HARVMAC_SECTION_SPLIT_RE = re.compile(
+        r"\\newsec\s*\{([^}]+)\}|"                                      # \newsec{Title}
+        r"\\appendix\s*(?:(?:\\[a-zA-Z]+)|(?:\{[^}]+\}))\s*\{([^}]+)\}" # \appendix{Label}{Title} or \appendix\Label{Title}
+    )
     _HARVMAC_SUBSEC_RE = re.compile(r"\\subsec\s*\{([^}]+)\}")
     _HARVMAC_LREF_RE = re.compile(r"\\lref\s*\\\w+\s*\{.*?\}", re.DOTALL)
     _HARVMAC_DATE_RE = re.compile(r"\\Date\s*\{[^}]*\}")
     _HARVMAC_BYE_RE = re.compile(r"\\bye")
 
     # --- Block Regex Patterns ---
-    _EQN_START_RE = re.compile(r"\\eqn\s*\\[a-zA-Z0-9]+\s*\{")
-    _IFIG_START_RE = re.compile(r"\\ifig\s*\\[a-zA-Z0-9]+\s*\{")
+    _EQN_START_RE = re.compile(r"\\eqn\s*\\([a-zA-Z0-9]+)\s*\{")
+    _IFIG_START_RE = re.compile(r"\\ifig\s*\\([a-zA-Z0-9]+)\s*\{")
+    _IIFIG_START_RE = re.compile(r"\\iifig\s*\\([a-zA-Z0-9]+)\s*\{")
     _DISPLAY_MATH_RE = re.compile(r"\$\$")
+    _EPS_FILE_RE = re.compile(r"([a-zA-Z0-9_\-\.]+\.(?:eps|ps|pdf|png|jpg))", re.IGNORECASE)
+
+    def _clean_title(title: str) -> str:
+        if not title:
+            return ""
+        
+        # Clear commands
+        t = re.sub(r'\\vbox\s*\{\s*', '', title)
+        t = re.sub(r'\\centerline\s*\{', '', t)
+        t = re.sub(r'\\vskip\s*[\.0-9]+(mm|cm|in|pt)', '', t)
+        t = re.sub(r'\}', '', t)
+        t = re.sub(r'\n', ' ', t)
+        t = re.sub(r'\(\s+', '(', t)
+        t = re.sub(r'\s+\)', ')', t)
+        t = re.sub(r'\s{2,}', ' ', t).strip()
+        return t
 
     def _clean_harvmac_text(text: str) -> str:
         """
@@ -35,16 +53,33 @@ def parse_plain_tex(
         # Remove structural macros
         t = re.sub(r"\\bigskip", "\n", text)
         t = re.sub(r"\\medskip", "\n", t)
+        t = re.sub(r"\\smallskip", "\n", t)
+        t = re.sub(r"\\goodbreak\\*\s*", "", t)
+        t = re.sub(r"\\(vskip|vglue)\s*[\.0-9]+(mm|cm|in|pt)", "", t)
         t = re.sub(r"\\noindent", "", t)
         t = re.sub(r"\\item\{.*?\}", "", t)
         
         # --- FIX: Target ONLY specific font commands, preserve math (\mu, \xi, etc.) ---
         # Removes \rm, \it, \bf, \tt, \sl followed by a word boundary
-        t = re.sub(r"\\(rm|it|bf|tt|sl)\b", "", t)
+        t = re.sub(r"\\(rm|it|bf|tt|sl)\s+", "", t)
+        
+        # Eliminate \ spacing
+        t = re.sub(r"\\\s+", " ", t)
         
         # Collapse whitespace
-        t = re.sub(r"\s+", " ", t).strip()
-        return t
+        try:
+            t = t.replace('  ', ' ')
+        except:
+            pass # OK
+        try:
+            t = re.sub(r"\(\s+", "(", t)
+        except:
+            pass # OK
+        try:
+            t = re.sub(r"\s+\)", ")", t)
+        except:
+            pass # OK
+        return t.strip()
     
     raw = file_map[main_tex]
     
@@ -61,12 +96,14 @@ def parse_plain_tex(
             math_match = _DISPLAY_MATH_RE.search(text, cursor)
             eqn_match = _EQN_START_RE.search(text, cursor)
             ifig_match = _IFIG_START_RE.search(text, cursor)
+            iifig_match = _IIFIG_START_RE.search(text, cursor)
             
             # Sort matches by position to find the closest one
             candidates = []
             if math_match: candidates.append((math_match.start(), 'math', math_match))
             if eqn_match: candidates.append((eqn_match.start(), 'eqn', eqn_match))
             if ifig_match: candidates.append((ifig_match.start(), 'figure', ifig_match))
+            if iifig_match: candidates.append((iifig_match.start(), 'figure', iifig_match))
             
             candidates.sort(key=lambda x: x[0])
             
@@ -76,7 +113,17 @@ def parse_plain_tex(
                 clean = _clean_harvmac_text(remaining)
                 if clean:
                     for sent in split_sentences(clean):
-                        parent_node.add_child(FileNode(node_type="sentence", content=sent))
+                        # Eliminate commands
+                        sent = re.sub(r'\\listrefs', '', sent)
+                        sent = re.sub(r'\\end', '', sent)
+
+                        sent = sent.replace('\n', ' ') # Change one newline to space
+                        sent = re.sub(r'\s{2,}', ' ', sent) # Eliminate excess space
+                        sent = re.sub(r'\(\s+', '(', sent) # Eliminate excess space
+                        sent = re.sub(r'\s+\)', ')', sent).strip() # Eliminate excess space
+
+                        if sent:
+                            parent_node.add_child(FileNode(node_type="sentence", content=sent))
                 break
                 
             start_pos, type_, match = candidates[0]
@@ -87,7 +134,12 @@ def parse_plain_tex(
                 clean_pre = _clean_harvmac_text(pre_text)
                 if clean_pre:
                     for sent in split_sentences(clean_pre):
-                        parent_node.add_child(FileNode(node_type="sentence", content=sent))
+                        sent = sent.replace('\n', ' ') # Change one newline to space
+                        sent = re.sub(r'\s{2,}', ' ', sent) # Eliminate excess space
+                        sent = re.sub(r'\(\s+', '(', sent) # Eliminate excess space
+                        sent = re.sub(r'\s+\)', ')', sent) # Eliminate excess space
+                        if sent:
+                            parent_node.add_child(FileNode(node_type="sentence", content=sent))
             
             # Process the block
             if type_ == 'math':
@@ -96,6 +148,10 @@ def parse_plain_tex(
                 end_match = _DISPLAY_MATH_RE.search(text, content_start)
                 if end_match:
                     content = text[content_start:end_match.start()]
+                    content = re.sub(r'\s{2,}', ' ', content) # Eliminate excess space
+                    content = re.sub(r'\s+\,\s+', ', ', content) # Eliminate excess space
+                    content = re.sub(r'\(\s+', '(', content) # Eliminate excess space
+                    content = re.sub(r'\s+\)', ')', content) # Eliminate excess space
                     parent_node.add_child(FileNode(node_type="math", content=content.strip()))
                     cursor = end_match.end()
                 else:
@@ -105,27 +161,198 @@ def parse_plain_tex(
                 # \eqn\label{ body }
                 # Match ends at '{', so brace starts at match.end()-1
                 brace_start = match.end() - 1
+                label = match.group(1)
                 find_end = find_balanced_braces(text, brace_start)
                 if find_end:
                     _, brace_end = find_end
-                    content = text[brace_start + 1 : brace_end]
-                    parent_node.add_child(FileNode(node_type="math", content=content.strip()))
+                    content = _clean_harvmac_text(text[brace_start + 1 : brace_end])
+                    content = re.sub(r'\s{2,}', ' ', content) # Eliminate excess space
+                    content = re.sub(r'\s+\,\s+', ', ', content) # Eliminate excess space
+                    content = re.sub(r'\(\s+', '(', content) # Eliminate excess space
+                    content = re.sub(r'\s+\)', ')', content) # Eliminate excess space
+                    parent_node.add_child(FileNode(
+                        node_type="math", label=label.strip(), content=content.strip()
+                    ))
                     cursor = brace_end + 1
                 else:
                     cursor = match.end()
 
             elif type_ == 'figure':
-                # \ifig\label{Caption}
-                brace_start = match.end() - 1
-                find_end = find_balanced_braces(text, brace_start)
-                if find_end:
-                    _, brace_end = find_end
-                    caption = text[brace_start + 1 : brace_end]
-                    clean_cap = _clean_harvmac_text(caption)
-                    parent_node.add_child(FileNode(node_type="figure", content=clean_cap))
-                    cursor = brace_end + 1
-                else:
-                    cursor = match.end()
+                if 'iifig' in candidates[0][2][0]:
+                    # 1. Extract Label
+                    fig_label = match.group(1)
+                    
+                    # 2. Extract Caption's first line (First Brace Block)
+                    brace_start_1 = match.end() - 1
+                    res_1 = find_balanced_braces(text, brace_start_1)
+                    
+                    if res_1:
+                        _, brace_end_1 = res_1
+                        caption_text = text[brace_start_1+1:brace_end_1]
+                        clean_cap = _clean_harvmac_text(caption_text)
+
+                        # 3. Extract Caption's second line (Second Brace Block)
+                        next_cursor = brace_end_1 + 1
+                        # Skip whitespace
+                        while next_cursor < n and text[next_cursor].isspace():
+                            next_cursor += 1
+                        
+                        if next_cursor < n:
+                            if text[next_cursor] == '{':
+                                res_2 = find_balanced_braces(text, next_cursor)
+                                if res_2:
+                                    _, brace_end_2 = res_2
+                                    second_line_content = text[next_cursor+1:brace_end_2]
+                                    next_cursor = brace_end_2 + 1
+
+                        clean_cap += ' ' + _clean_harvmac_text(second_line_content)
+                        
+                        # 4. Extract Content (Heuristic for 4th arg)
+                        # Skip whitespace
+                        while next_cursor < n and text[next_cursor].isspace():
+                            next_cursor += 1
+                        second_line_content = ''
+                        fig_content = ""
+                        final_cursor = brace_end_2 + 1
+                        
+                        if next_cursor < n:
+                            if text[next_cursor] == '{':
+                                # Case A: \ifig\l{Cap}{Content}
+                                res_3 = find_balanced_braces(text, next_cursor)
+                                if res_3:
+                                    _, brace_end_3 = res_3
+                                    fig_content = text[next_cursor+1:brace_end_3]
+                                    final_cursor = brace_end_3 + 1
+                            
+                            elif text.startswith(r"\centerline", next_cursor):
+                                # Case B: \ifig\l{Cap}\centerline{Content}
+                                # Find the brace after centerline
+                                cl_brace_start = text.find('{', next_cursor)
+                                if cl_brace_start != -1:
+                                    res_3 = find_balanced_braces(text, cl_brace_start)
+                                    if res_3:
+                                        _, brace_end_3 = res_3
+                                        # Capture inner content of centerline
+                                        fig_content = text[cl_brace_start+1:brace_end_3]
+                                        final_cursor = brace_end_3 + 1
+                        
+                        # --- Update: Explicitly Strip \centerline inside the extracted content ---
+                        # Sometimes content is extracted as { \centerline{...} } or similar if parsing was loose
+                        # But here fig_content is already the inner part if we hit Case B.
+                        # If we hit Case A, fig_content might be "\centerline{...}" if the user wrote \ifig{}{ \centerline{} }
+                        
+                        if fig_content.strip().startswith(r"\centerline"):
+                            # Find first brace of this inner centerline
+                            inner_brace_start = fig_content.find('{')
+                            if inner_brace_start != -1:
+                                # We need to find the matching closing brace *within fig_content*
+                                # Since fig_content is a string, we can use our helper, starting at that brace
+                                res_inner = find_balanced_braces(fig_content, inner_brace_start)
+                                if res_inner:
+                                    _, inner_brace_end = res_inner
+                                    # Replace fig_content with just the inner part
+                                    fig_content = fig_content[inner_brace_start + 1 : inner_brace_end]
+
+                        # Clean up content (extract filename if possible)
+                        if fig_content:
+                            file_match = _EPS_FILE_RE.search(fig_content)
+                            if file_match:
+                                fig_content = file_match.group(1) # Just the filename
+                            else:
+                                fig_content = _clean_harvmac_text(fig_content) # Clean text representation
+
+                        # Add Node
+                        parent_node.add_child(FileNode(
+                            node_type="figure", 
+                            content=fig_content, 
+                            title=clean_cap,
+                            label=fig_label
+                        ))
+                        
+                        cursor = final_cursor
+                    else:
+                        cursor = match.end()
+                
+                else:   # ifig
+                    # 1. Extract Label
+                    fig_label = match.group(1)
+                    
+                    # 2. Extract Caption (First Brace Block)
+                    brace_start_1 = match.end() - 1
+                    res_1 = find_balanced_braces(text, brace_start_1)
+                    
+                    if res_1:
+                        _, brace_end_1 = res_1
+                        caption_text = text[brace_start_1+1:brace_end_1]
+                        clean_cap = _clean_harvmac_text(caption_text)
+                        
+                        # 3. Extract Content (Heuristic for 3rd arg)
+                        next_cursor = brace_end_1 + 1
+                        
+                        # Skip whitespace
+                        while next_cursor < n and text[next_cursor].isspace():
+                            next_cursor += 1
+                        
+                        fig_content = ""
+                        final_cursor = brace_end_1 + 1
+                        
+                        if next_cursor < n:
+                            if text[next_cursor] == '{':
+                                # Case A: \ifig\l{Cap}{Content}
+                                res_2 = find_balanced_braces(text, next_cursor)
+                                if res_2:
+                                    _, brace_end_2 = res_2
+                                    fig_content = text[next_cursor+1:brace_end_2]
+                                    final_cursor = brace_end_2 + 1
+                            
+                            elif text.startswith(r"\centerline", next_cursor):
+                                # Case B: \ifig\l{Cap}\centerline{Content}
+                                # Find the brace after centerline
+                                cl_brace_start = text.find('{', next_cursor)
+                                if cl_brace_start != -1:
+                                    res_2 = find_balanced_braces(text, cl_brace_start)
+                                    if res_2:
+                                        _, brace_end_2 = res_2
+                                        # Capture inner content of centerline
+                                        fig_content = text[cl_brace_start+1:brace_end_2]
+                                        final_cursor = brace_end_2 + 1
+                        
+                        # --- Update: Explicitly Strip \centerline inside the extracted content ---
+                        # Sometimes content is extracted as { \centerline{...} } or similar if parsing was loose
+                        # But here fig_content is already the inner part if we hit Case B.
+                        # If we hit Case A, fig_content might be "\centerline{...}" if the user wrote \ifig{}{ \centerline{} }
+                        
+                        if fig_content.strip().startswith(r"\centerline"):
+                            # Find first brace of this inner centerline
+                            inner_brace_start = fig_content.find('{')
+                            if inner_brace_start != -1:
+                                # We need to find the matching closing brace *within fig_content*
+                                # Since fig_content is a string, we can use our helper, starting at that brace
+                                res_inner = find_balanced_braces(fig_content, inner_brace_start)
+                                if res_inner:
+                                    _, inner_brace_end = res_inner
+                                    # Replace fig_content with just the inner part
+                                    fig_content = fig_content[inner_brace_start + 1 : inner_brace_end]
+
+                        # Clean up content (extract filename if possible)
+                        if fig_content:
+                            file_match = _EPS_FILE_RE.search(fig_content)
+                            if file_match:
+                                fig_content = file_match.group(1) # Just the filename
+                            else:
+                                fig_content = _clean_harvmac_text(fig_content) # Clean text representation
+
+                        # Add Node
+                        parent_node.add_child(FileNode(
+                            node_type="figure", 
+                            content=fig_content, 
+                            title=clean_cap,
+                            label=fig_label
+                        ))
+                        
+                        cursor = final_cursor
+                    else:
+                        cursor = match.end()
 
     # 1. Preprocessing
     clean_raw = strip_comments(raw)
@@ -133,13 +360,41 @@ def parse_plain_tex(
 
     # 2. Extract Title and Create Root
     root = FileNode(node_type="document")
-    title_match = _HARVMAC_TITLE_RE.search(clean_raw)
-
-    body_start_index = 0
-    if title_match:
-        raw_title = title_match.group(1)
-        root.title = _clean_harvmac_text(raw_title)
-        body_start_index = title_match.end()
+    title_idx = clean_raw.find(r"\Title")
+    if title_idx != -1:
+        # Find first brace (Report Number arg)
+        arg1_start = clean_raw.find("{", title_idx)
+        if arg1_start != -1:
+            res1 = find_balanced_braces(clean_raw, arg1_start)
+            if res1:
+                _, arg1_end = res1
+                
+                # Find second brace (Actual Title)
+                # Skip whitespace after first arg
+                arg2_search_start = arg1_end + 1
+                while (arg2_search_start < len(clean_raw)
+                       and clean_raw[arg2_search_start].isspace()):
+                    arg2_search_start += 1
+                
+                if (arg2_search_start < len(clean_raw)
+                    and clean_raw[arg2_search_start] == "{"):
+                    res2 = find_balanced_braces(clean_raw, arg2_search_start)
+                    if res2:
+                        _, arg2_end = res2
+                        raw_title = clean_raw[arg2_search_start+1:arg2_end]
+                        
+                        # Cleanup: Remove \centerline wrapper if common in titles
+                        if raw_title.strip().startswith(r"\centerline"):
+                            cl_start = raw_title.find("{")
+                            if cl_start != -1:
+                                res_cl = find_balanced_braces(raw_title, cl_start)
+                                if res_cl:
+                                    _, cl_end = res_cl
+                                    raw_title = raw_title[cl_start + 1 : cl_end]
+                                    
+                        title = _clean_harvmac_text(raw_title)
+                        root.title = _clean_title(title)
+                        body_start_index = arg2_end + 1
 
     # 3. Isolate Body
     body_text = clean_raw[body_start_index:]
@@ -147,8 +402,10 @@ def parse_plain_tex(
     if bye_match:
         body_text = body_text[:bye_match.start()]
 
-    # 4. Hierarchical Parsing (Abstract -> \newsec -> \subsec)
-    parts = _HARVMAC_NEWSEC_RE.split(body_text)
+    # 4. Hierarchical Parsing (Abstract -> Sections -> Subsections)
+    # Using re.split with multiple capture groups creates a list like:
+    # [Pretext, NewsecTitle, None, Body, None, AppendixTitle, Body, ...]
+    parts = _HARVMAC_SECTION_SPLIT_RE.split(body_text)
 
     # Part 0: Abstract/Intro (before first \newsec)
     preamble = parts[0]
@@ -156,15 +413,43 @@ def parse_plain_tex(
     abstract_text = _clean_harvmac_text(preamble)
 
     if abstract_text:
+        abstract_node = FileNode(node_type = "section", title = "Abstract")
         for sent in split_sentences(abstract_text):
-            root.add_child(FileNode(node_type="sentence", content=sent))
+            # Remove author's info
+            if r'\centerline' in sent:
+                continue
+            # Remove excess macro
+            if r'\let\includefigures=\iftrue' in sent:
+                continue
+            if r'\break' in sent:
+                continue
+            # Remove weird braces, occured when the function accidentally split the names
+            if '}' in sent and '{' not in sent:
+                continue
+            elif '{' in sent and '}' not in sent:
+                continue
 
-    # Loop through sections (Title -> Body pairs)
-    for i in range(1, len(parts), 2):
-        sec_title = _clean_harvmac_text(parts[i])
-        sec_body = parts[i+1]
+            if sent:
+                sent = re.sub(r'\s{2,}', ' ', sent) # Eliminate excess space
+                sent = sent.replace('\n', ' ') # Change one newline to space
+                abstract_node.add_child(FileNode(node_type="sentence", content=sent))
+        root.add_child(abstract_node)
+
+    for i in range(1, len(parts), 3):
+        newsec_title = parts[i]
+        appendix_title = parts[i+1]
+        sec_body = parts[i+2]
         
-        sec_node = FileNode(node_type="section", title=sec_title)
+        # Determine raw title and type
+        if newsec_title is not None:
+            raw_title = newsec_title
+            node_type = "section"
+        else:
+            raw_title = appendix_title
+            node_type = "section" # Appendices act as sections
+        
+        sec_title = _clean_harvmac_text(raw_title)
+        sec_node = FileNode(node_type=node_type, title=sec_title)
         
         # Split by \subsec
         sub_parts = _HARVMAC_SUBSEC_RE.split(sec_body)
@@ -177,7 +462,7 @@ def parse_plain_tex(
         # Subsections (Title -> Body pairs)
         for j in range(1, len(sub_parts), 2):
             subsec_title = _clean_harvmac_text(sub_parts[j])
-            subsec_body = sub_parts[j + 1]
+            subsec_body = sub_parts[j+1]
             
             subsec_node = FileNode(node_type="subsection", title=subsec_title)
             _parse_harvmac_content(subsec_node, subsec_body)
@@ -185,7 +470,6 @@ def parse_plain_tex(
             sec_node.add_child(subsec_node)
             
         root.add_child(sec_node)
-
     return root
 
 def parse_tex_files(version_path: str, tex_files: List[str]) -> FileNode:
@@ -487,6 +771,7 @@ def parse_tex_files(version_path: str, tex_files: List[str]) -> FileNode:
                 end_pat = BLOCK_END_MAP.get(env)
                 if end_pat and end_pat.search(line):
                     node_type = "listing" if env in {"listing", "lstlisting"} else env
+                    #
                     current_stack[-1].add_child(FileNode(node_type=node_type, content="\n".join(block_buffer)))
                     block_buffer = []
                     in_block_env = None

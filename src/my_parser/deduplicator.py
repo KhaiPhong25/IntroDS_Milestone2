@@ -1,9 +1,9 @@
 from .file_node import *
-import hashlib
+import hashlib, re
 from collections import defaultdict
 from typing import Dict
 
-def fast_normalize_and_id(root: FileNode, pub_id: str, version: str):
+def fast_normalize_and_id(root: FileNode, version: str):
     """
     Iterative normalization and ID assignment.
     Combines what used to be two separate recursive passes into one.
@@ -21,76 +21,178 @@ def fast_normalize_and_id(root: FileNode, pub_id: str, version: str):
         node = stack.pop()
         
         # --- 1. ID Assignment ---
-        node.id = f"{pub_id}_{version}_{counter:06d}"
-        counter += 1
+        node.id = f"{version}_{counter:06d}"
         
         # --- 2. Normalization Logic ---
-        # This logic mimics your original normalize_node function
         node_type = getattr(node, "node_type", None)
         
         if node_type == "sentence":
-            raw_text = getattr(node, "text", None)
-            if raw_text is None:
-                raw_text = getattr(node, "content", "")
-            node.full_text = raw_text.strip() if raw_text else ""
+            content = getattr(node, "content", "")
+            node.content = content.strip() if content else ""
+            node.full_text = content
 
         elif node_type in {"figure", "table"}:
             parts = []
             caption = getattr(node, "caption", None)
-            if caption: parts.append(caption.strip())
+            if caption:
+                node.caption = caption.strip()
+                parts.append(caption)
+                
             label = getattr(node, "label", None)
-            if label: parts.append(label.strip())
+            if label:
+                node.label = label.strip()
+                parts.append(label)
             
-            if not parts:
-                raw = getattr(node, "content", "") or ""
-                parts.append(raw.strip())
-            node.full_text = " ".join(parts)
+            content = getattr(node, "content", "")
+            node.content = content
+            parts.append(content)
+            node.full_text = ' | '.join(parts)
 
-        elif node_type in {"itemize", "enumerate", "listing", "math"}:
-            raw = getattr(node, "content", "") or ""
-            node.full_text = raw.strip()
+        elif node_type in {"itemize", "enumerate", "listing"}:
+            content = getattr(node, "content", "")
+            node.content = content
+            node.full_text = content
+
+        elif node_type == "math":
+            parts = []
+            label = getattr(node, "caption", "")
+            if label:
+                node.label = label.strip()
+                parts.append(label)
+                
+            content = getattr(node, "content", "")
+            node.content = content
+            parts.append(content)
+            node.full_text = ' | '.join(parts)
 
         elif node_type in {"section", "subsection", "subsubsection", "paragraph", "document"}:
-            node.full_text = (getattr(node, "title", None) or "").strip()
+            node.content = (getattr(node, "title", None) or "").strip()
+            node.full_text = node.content
         else:
-            node.full_text = ""
+            node.content = ""
+            node.full_text = node.content
 
         # Add children to stack in reverse order so they are popped in original order
         if hasattr(node, "children") and node.children:
             stack.extend(reversed(node.children))
 
-def build_content_index(root: FileNode, using_SHA256: bool = False):
-    """
-    Builds the content index using fast built-in hashing or SHA256 hashing.
-    """
-    index = defaultdict(list)
-    stack = [root]
-    
-    while stack:
-        node = stack.pop()
-        
-        if hasattr(node, "full_text") and node.full_text:
-            # Quick hash: Python built-in hashing Non-cryptographic (SipHash-2-4)
-            # One-to-one hash: SHA256
-            if using_SHA256:
-                h = hashlib.sha256(
-                    node.full_text.encode("utf-8")
-                ).hexdigest()
-            else:
-                h = hash(node.full_text)
-            index[h].append(node)
-            
-        if hasattr(node, "children") and node.children:
-            stack.extend(node.children)
-            
-    return index
+        counter += 1
 
-def deduplicate_tree(source_root: FileNode, content_index: Dict, using_SHA256: bool = False):
+def _compute_subtree_hash(node: FileNode) -> str:
     """
-    Iterative deduplication.
-    Traverses source_root; if a node matches one in content_index, 
-    swaps it in the parent's children list and stops traversing that branch.
+    Computes a hash representing the node's content AND its structure.
+    Hash = sha256(node_type + full_text + child_hashes)
     """
+    hasher = hashlib.sha256()
+    
+    # 1. Self Content
+    hasher.update(getattr(node, "node_type", "unknown").encode("utf-8"))
+    hasher.update((getattr(node, "full_text", "") or "").encode("utf-8"))
+    
+    # 2. Children Structure
+    # Relies on `_temp_hash` being present on children (computed in Bottom-Up pass)
+    if hasattr(node, "children") and node.children:
+        for child in node.children:
+            # If child is from V1 (swapped), it might not have _temp_hash unless we set it
+            # If child is from V2 (new), it has _temp_hash
+            child_hash = getattr(child, "_temp_hash", "")
+            
+            # Fallback (should ideally not be hit if logic is correct)
+            if not child_hash:
+                # This recursion is expensive, but safety net
+                child_hash = _compute_subtree_hash(child) 
+                child._temp_hash = child_hash
+                
+            hasher.update(child_hash.encode("utf-8"))
+            
+    return hasher.hexdigest()
+
+
+def deduplicate_tree(source_root: FileNode, content_index: Dict[str, FileNode]):
+    """
+    Iterative Bottom-Up Deduplication.
+    
+    1. Traverses the tree leaves-first (Post-Order).
+    2. Computes hash for each node (Content + Children's Hashes).
+    3. If hash exists in `content_index`, marks node for replacement.
+    4. Updates parent's children pointers to point to existing nodes.
+    
+    The 'content_index' is populated during the first run (v1) and matched/updated
+    in subsequent runs (v2, v3...).
+    """
+    
+    # # 1. Build Processing Stack (Standard DFS to get Pre-Order)
+    # traversal_stack = [source_root]
+    # processing_stack = [] 
+    
+    # while traversal_stack:
+    #     node = traversal_stack.pop()
+    #     processing_stack.append(node)
+    #     if hasattr(node, "children") and node.children:
+    #         for child in node.children:
+    #             traversal_stack.append(child)
+                
+    # # 2. Process in Reverse (Bottom-Up: Leaves first, then Parents)
+    # # processing_stack is [Root, Child, Grandchild]
+    # # reversed is [Grandchild, Child, Root]
+    
+    # for node in reversed(processing_stack):
+    #     # A. Link Fixup
+    #     # Update children list if any child was marked as a duplicate
+    #     if hasattr(node, "children") and node.children:
+    #         new_children = []
+    #         changed = False
+    #         for child in node.children:
+    #             # If child has a canonical replacement, use it
+    #             if hasattr(child, "_canonical_ref"):
+    #                 canonical = child._canonical_ref
+    #                 new_children.append(canonical)
+    #                 if canonical is not child:
+    #                     changed = True
+    #             else:
+    #                 new_children.append(child)
+            
+    #         if changed:
+    #             node.children = new_children
+
+    #     # B. Compute Hash
+    #     # This uses the *current* children (which might be mixed V2 and V1 nodes)
+    #     current_hash = _compute_subtree_hash(node)
+    #     node._temp_hash = current_hash
+        
+    #     # C. Check Index
+    #     if current_hash in content_index:
+    #         # Duplicate Found!
+    #         existing_node = content_index[current_hash]
+            
+    #         # Mark this node to be replaced by the existing one
+    #         node._canonical_ref = existing_node
+            
+    #         # CRITICAL: Ensure the existing node has the hash cached 
+    #         # so that *this node's parent* can read it in step B above.
+    #         existing_node._temp_hash = current_hash
+    #     else:
+    #         # Unique Node (or First Version)
+    #         content_index[current_hash] = node
+    #         node._canonical_ref = node
+
+    # # Cleanup is optional but recommended. 
+    # # We remove _temp_hash to save memory, but _canonical_ref might be useful 
+    # # if the caller wants to know if the Root itself was deduplicated.
+    # for node in processing_stack:
+    #     if hasattr(node, "_temp_hash"): 
+    #         del node._temp_hash
+    #     # Clean up _canonical_ref on nodes that are NOT the root (internal nodes)
+    #     # We keep it on Root implicitly via the return/structure, 
+    #     # but the attribute itself can go.
+    #     if hasattr(node, "_canonical_ref"): 
+    #         del node._canonical_ref
+
+#     """
+#     Iterative deduplication.
+#     Traverses source_root; if a node matches one in content_index, 
+#     swaps it in the parent's children list and stops traversing that branch.
+#     """
     # Stack stores: (node, parent_node, index_in_parent_children)
     stack = [(source_root, None, -1)]
     
@@ -99,23 +201,17 @@ def deduplicate_tree(source_root: FileNode, content_index: Dict, using_SHA256: b
         
         # Only try to deduplicate if it has content
         if hasattr(node, "full_text") and node.full_text:
-            if using_SHA256:
-                h = hashlib.sha256(
-                    node.full_text.encode("utf-8")
-                ).hexdigest()
-            else:
-                h = hash(node.full_text)
+            # if using_SHA256:
+            #     h = hashlib.sha256(
+            #         node.full_text.encode("utf-8")
+            #     ).hexdigest()
+            # else:
+            #     h = hash(node.full_text)
+            h = _compute_subtree_hash(node)
             
             if h in content_index:
-                candidates = content_index[h]
-                found = None
-                
-                # Collision check: explicit string comparison
-                # This ensures accuracy despite using non-crypto hash
-                for cand in candidates:
-                    if cand.full_text == node.full_text:
-                        found = cand
-                        break
+                candidate = content_index[h]
+                found = candidate if candidate.full_text == node.full_text else None
                 
                 if found:
                     # Duplicate found! Replace in parent.
@@ -128,10 +224,82 @@ def deduplicate_tree(source_root: FileNode, content_index: Dict, using_SHA256: b
             
             # If not found (or no content), we index it (canonicalize this version's unique nodes)
             # This handles intra-version duplicates or helps future versions match this unique node
-            content_index[h].append(node)
+            content_index[h] = node
 
         # Push children to stack
         if hasattr(node, "children") and node.children:
             # Push in reverse order
             for i in range(len(node.children) - 1, -1, -1):
                 stack.append((node.children[i], node, i))
+
+def serialize_node(roots_info: Dict[str, FileNode]) -> Dict:
+    elements = {}
+    hierarchy = {}
+
+    LEAF_TYPES = {
+        'sentence', 'math', 'figure', 'table',
+        'itemize', 'enumerate', 'listing', 'lstlisting'
+    }
+
+    for version_name, root in roots_info.items():
+        find_version = re.search('[0-9]+(v[0-9]+)', version_name)
+        version = find_version.group(1)
+        # Initialize hierarchy for this version
+        hierarchy[version] = {}
+        
+        # Stack: (current_node, parent_id)
+        # We assume the root has no parent (None)
+        stack = [(root, None)]
+        
+        while stack:
+            node, parent_id = stack.pop()
+            
+            # 1. Get/Validate ID
+            node_id = getattr(node, "id", None)
+            node_version_find = re.search(r'[0-9]+(v[0-9]+)\_', node_id)
+            node_version = node_version_find.group(1)
+            if not node_id:
+                # Skip nodes without IDs (should not happen in properly normalized trees)
+                continue
+                
+            # 2. Build Hierarchy for THIS version
+            # Even if the node is reused from v1 (has v1_id), its position 
+            # in this tree belongs to 'ver_name'.
+            if parent_id is not None and node_version == version:
+                hierarchy[version][node_id] = parent_id
+                
+            # 3. Build Elements (if not already added)
+            # Since nodes are shared/deduplicated, we might encounter the same ID multiple times.
+            # We only need to store it once.
+            if node_id not in elements:
+                node_type = getattr(node, "node_type", "unknown")
+                
+                if node_type not in LEAF_TYPES:
+                    # Structural -> Map ID to Title String
+                    # Prefer full_text (normalized), fallback to title
+                    text = getattr(node, "full_text", "") or getattr(node, "title", "") or ""
+                    elements[node_id] = text
+                else:
+                    # Leaf -> Map ID to Content Dictionary
+                    # Extract attributes, excluding internal keys
+                    content_dict = {}
+                    
+                    # We manually map specific known fields to avoid leaking internals
+                    # or python specific attributes like __dict__
+                    for attr in ["node_type", "content", "title", "label", "caption"]:
+                        val = getattr(node, attr, None)
+                        if val:
+                            content_dict[attr] = val
+
+                    elements[node_id] = content_dict
+
+            # 4. Traverse Children
+            # Push in reverse order so they are popped in forward order (DFS)
+            if hasattr(node, "children") and node.children:
+                for child in reversed(node.children):
+                    stack.append((child, node_id))
+                    
+    return {
+        "elements": elements,
+        "hierarchy": hierarchy
+    }

@@ -116,22 +116,24 @@ def find_balanced_braces(s: str, start: int) -> Optional[Tuple[int, int]]:
 def detect_title_from_tex(tex: str) -> Optional[str]:
     """Detect \\title{...} (or \\title[short]{long}) from the preamble."""
 
-    TITLE_CMD_RE = re.compile(r"\\title(?![A-Za-z])\s*(\[[^\]]*\]\s*)?\{", re.M)
+    TITLE_CMD_RE = re.compile(r"\\(title|aistatstitle)(?![A-Za-z])\s*(\[[^\]]*\]\s*)?\{", re.M)
 
     cleaned = strip_comments(tex)
-    doc_pos = cleaned.find(r"\begin{document}")
-    head = cleaned if doc_pos == -1 else cleaned[:doc_pos]
 
-    m = TITLE_CMD_RE.search(head)
+    m = TITLE_CMD_RE.search(cleaned)
     if not m:
         return None
 
     brace_start = m.end() - 1
-    rng = find_balanced_braces(head, brace_start)
+    rng = find_balanced_braces(cleaned, brace_start)
     if not rng:
         return None
     a, b = rng
-    raw = head[a + 1 : b].strip()
+    raw = cleaned[a + 1 : b]
+    raw = re.sub(r"\\\\", " ", raw)
+    raw = re.sub(r"\n", " ", raw)
+    raw = re.sub(r"\s{2,}", " ", raw)
+    raw = re.sub(r"\\(?:if|fi|vspace)[A-Za-z]*\{*[\w\-\.]*\}*", "", raw).strip()
     return raw or None
 
 def collect_zero_arg_macros(tex: str) -> Dict[str, str]:
@@ -267,7 +269,7 @@ def reflow_section_commands(tex: str) -> str:
     from missing headings when the title content contains newlines.
     """
 
-    SECTION_START_RE = re.compile(r"\\(section|subsection|subsubsection|paragraph)\*?")
+    SECTION_START_RE = re.compile(r"\\(section|subsection|subsubsection|paragraph|appendix|chapter)\*?")
     s = tex
     i = 0
     out: List[str] = []
@@ -369,17 +371,26 @@ def build_macro_map(raw_texts_in_order: List[str]) -> Dict[str, str]:
 
 def preprocess_text(tex: str, macros: Dict[str, str]) -> List[str]:
     """Process text with early line filtering."""
-    SKIP_LINE_RE = re.compile(r"^\s*\\(?:newcommand|renewcommand|providecommand|def|gdef|xdef|edef)\b")
+    SKIP_LINE_RE = [
+        re.compile(r"^\s*\\(?:newcommand|renewcommand|providecommand|def|gdef|xdef|edef)\b"),
+        re.compile(r"^\s*\\if[\w]*[\s\S]*\\fi\s*"),
+        re.compile(r"^\s*\\(title|aistatstitle)\s*\[*[\s\S]*\]*\{*[\s\S]*\}*"),
+    ]
     t = remove_noindent(tex)
     t = strip_comments(t)
     
     # Filter and process in single pass
     result_lines = []
     for ln in t.splitlines(keepends=True):
-        if SKIP_LINE_RE.match(ln):
-            # Keep line breaks but skip content
-            result_lines.append("\n" if "\n" in ln else "")
-        else:
+        matched = False
+        for re_ in SKIP_LINE_RE:
+            if re_.match(ln):
+                # Keep line breaks but skip content
+                result_lines.append("\n" if "\n" in ln else "")
+                matched = True
+                break
+
+        if not matched:
             result_lines.append(ln)
     
     t2 = "".join(result_lines)
@@ -393,52 +404,53 @@ def preprocess_text(tex: str, macros: Dict[str, str]) -> List[str]:
 
 
 def split_sentences(text: str) -> List[str]:
-    """Optimized sentence splitter with minimal allocations."""
-    PLACEHOLDER_MAP = {
-        "...": "<ELLIPSIS>",
-        "e.g.": "<EG>",
-        "etc.": "<ETC>",
-        "c.f.": "<CF>",
-        "i.e.": "<IE>",
-        "et al.": "<ETAL>",
-        "vs.": "<VS>",
-        "fig.": "<FIG>",
-        "eq.": "<EQ>",
-        "sec.": "<SEC>",
-    }
-
-    RESTORE_MAP = {v: k for k, v in PLACEHOLDER_MAP.items()}
-    DECIMAL_PAT = re.compile(r"(?<=\d)\.(?=\d)")
-    INITIALS_PAT = re.compile(r"\b(?:[A-Z]\.){2,}")
-    SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s+(?=(?:[\"'\(\[\{]|\\)?[A-Z0-9])")
-    if not text or not text.strip():
+    """
+    Robust sentence splitter that preserves abbreviations.
+    
+    1. Protects periods in abbreviations (Fig., Ref., etc.)
+    2. Splits on [.!?] followed by whitespace.
+    3. Restores periods in the split sentences.
+    """
+    if not text:
         return []
     
-    # Single buffer for replacements
-    t = text
-    
-    # In-place patterns (pre-compiled)
-    t = t.replace("...", PLACEHOLDER_MAP["..."])
-    t = DECIMAL_PAT.sub("<DOT>", t)
-    t = INITIALS_PAT.sub(lambda m: m.group(0).replace(".", "<DOT>"), t)
-    
-    # Quick abbreviation checks (avoid regex compilation)
-    for abbrev, placeholder in PLACEHOLDER_MAP.items():
-        if abbrev in t:  # Quick check first
-            t = t.replace(abbrev, placeholder)
-    
-    # Split and restore
-    chunks = SENTENCE_BOUNDARY.split(t)
-    out: List[str] = []
-    
-    for c in chunks:
-        if not c or not c.strip():
+    _ABBREV_PROTECT_PATTERNS = [
+        # Figures, References, Equations, Sections, Tables, Appendix
+        re.compile(r"\b(Figs?|Refs?|Eqs?|Secs?|Tabs?|Apps?|Nos?|Vols?|Pgs?|p|pp)\.\s", re.IGNORECASE),
+        # Common Latin abbreviations
+        re.compile(r"\b(i\.e|e\.g|vs|cf|et al)\.\s", re.IGNORECASE),
+        # Honorifics (add more if needed)
+        re.compile(r"\b(Dr|Mr|Mrs|Ms|Prof|Dept)\.\s", re.IGNORECASE),
+        re.compile(r"\b[A-Z]\.\s", re.IGNORECASE),
+    ]
+
+    # 1. Protect Abbreviations
+    # Replace "Fig. " with "Fig<DOT> " to hide the period from the splitter
+    protected_text = text
+    for pattern in _ABBREV_PROTECT_PATTERNS:
+        # We use a lambda to insert the <DOT> while keeping the original word
+        # The regex matches "Fig. " -> group 1 is "Fig"
+        # We replace with "\1<DOT> "
+        try:
+            protected_text = pattern.sub(lambda m: f"{m.group(1)}<DOT> ", protected_text)
+        except:
+            pass   # No match found, continue
+
+    # 2. Split Sentences
+    # Split on: Period/Question/Exclamation + Whitespace + (Lookahead for capital or number or quote)
+    # Note: Standard academic text often follows a period with a Capital letter.
+    # We use a simpler split: punctuation + whitespace.
+    # The lookbehind (?<=[.!?]) ensures we keep the punctuation.
+    sentences = re.split(r'(?<=[.!?])\s+', protected_text)
+
+    # 3. Restore and Clean
+    clean_sentences = []
+    for s in sentences:
+        s = s.strip()
+        if not s:
             continue
-        c = c.strip()
-        # Restore all placeholders
-        for placeholder, original in RESTORE_MAP.items():
-            c = c.replace(placeholder, original)
-        c = c.replace("<DOT>", ".")
-        out.append(c)
-    
-    return out
+        # Restore the <DOT> to a real period
+        s = s.replace("<DOT>", ".")
+        clean_sentences.append(s)
+
+    return clean_sentences

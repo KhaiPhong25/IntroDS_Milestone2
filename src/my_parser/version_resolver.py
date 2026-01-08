@@ -4,82 +4,87 @@ from typing import List, Set, Dict
 
 def resolve_included_tex(version_path: str, main_tex: str) -> List[str]:
     """
-    Resolve all included .tex files starting from the main file via iterative DFS.
-
-    Parameters
-    ----------
-    version_path : str
-        Directory containing the TeX source files.
-    main_tex : str
-        Filename of the root .tex file.
-
-    Returns
-    -------
-    List[str]
-        List of filenames in compilation order (pre-order traversal).
+    Resolves all .tex files included from the main .tex file using Iterative DFS.
+    
+    Optimizations:
+    - Iterative Stack (No recursion limit errors).
+    - Regex-based parsing (Faster than manual slicing).
+    - Deduplication via set (Prevents cycles).
+    
+    Returns:
+        List[str]: A list of filenames in 'True Compilation Order' (Pre-Order).
     """
-    # Regex to capture \input{...} or \include{...} (ignoring \includegraphics)
     INPUT_PATTERN = re.compile(r"\\(?:input|include)(?!graphics)\s*\{?([^}\s]+)\}?")
     ordered: List[str] = []
     visited: Set[str] = set()
     
-    # Initialize DFS stack with the main file
+    # Stack for DFS: (filename)
+    # We start with the main file
     stack = [main_tex]
 
     while stack:
         current_tex = stack.pop()
         
-        # Prevent circular dependencies
+        # Cycle prevention
         if current_tex in visited:
             continue
         
         visited.add(current_tex)
         ordered.append(current_tex)
 
-        # Normalize and resolve full file path
+        # 1. Resolve full path
         current_tex = normalize_tex_name(current_tex)
         file_path = os.path.join(version_path, current_tex)
-        
         if not os.path.isfile(file_path):
             continue
 
-        # Read content and strip comments to avoid false positives
+        # 2. Read and Strip Comments
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw_content = f.read()
             content = strip_comments(raw_content)
             
         except Exception:
-            # Skip scanning children if file read fails
+            # If read fails, skip scanning children
             continue
 
-        # Scan for included files
+        # 3. Find Children
+        # We need to preserve order: A, B, C.
+        # Stack is LIFO. To pop A then B then C, we must push C, then B, then A.
+        # So we collect matches, then push them in REVERSE order.
+        
         children = []
         for match in INPUT_PATTERN.finditer(content):
-            # Extract filename from group 1 (braced) or group 2 (unbraced)
+            # Group 1 (Braced) or Group 2 (Unbraced)
             found_name = match.group(1) or match.group(2)
             
             if found_name:
                 found_name = normalize_tex_name(found_name)
                 
-                # Handle relative paths like ./file.tex
+                # Verify existence immediately to avoid adding garbage to stack?
+                # Or let the loop handle it. Let's filter slightly here for path fixups.
+                
+                # Handle relative paths ./file.tex
                 if found_name.startswith("./"):
                     found_name = found_name[2:]
                     
+                # Robust logic for subdirectories (A/B.tex) is handled by os.path.join
+                # But we must check if it exists to avoid dead branches
                 full_child_path = os.path.join(version_path, found_name)
                 
-                # Verify file existence
+                # Check directly or check logic from original code (handling \\ and /)
                 if not os.path.isfile(full_child_path):
-                    # Fallback: check if file exists in root dir (flat structure assumption)
+                    # Try finding just basename (flat directory assumption fallback)
                     basename = os.path.basename(found_name)
                     if os.path.isfile(os.path.join(version_path, basename)):
                         found_name = basename
                     else:
+                        # Skip if file absolutely doesn't exist
                         continue
 
                 children.append(found_name)
 
-        # Push children to stack in reverse to maintain compilation order
+        # Push to stack in reverse order so the first match is popped first
         stack.extend(reversed(children))
 
     return ordered

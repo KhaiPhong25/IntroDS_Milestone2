@@ -11,6 +11,7 @@ class FileNode:
         self,
         node_type: str,
         title: Optional[str] = None,
+        label: Optional[str] = None,
         content: Optional[str] = None
     ):
         """
@@ -20,11 +21,14 @@ class FileNode:
             Type of node (document, section, sentence, table, figure, ...)
         title : Optional[str]
             Title of section-like nodes
+        label : Optional[str]
+            Label of figures/tables/equations
         content : Optional[str]
             Text content for leaf nodes
         """
         self.node_type = node_type
         self.title = title
+        self.label = label
         self.content = content
         self.children: List["FileNode"] = []
 
