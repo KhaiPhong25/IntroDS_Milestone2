@@ -5,38 +5,30 @@ from difflib import SequenceMatcher
 def levenshtein_distance(s1: str, s2: str) -> int:
     """
     Calculate Levenshtein edit distance between two strings.
-    
-    Uses dynamic programming to compute minimum number of single-character
+
+    Uses dynamic programming to compute the minimum number of single-character
     edits (insertions, deletions, substitutions) needed to transform s1 to s2.
-    
+
     Parameters
     ----------
     s1, s2 : str
-        Input strings to compare
-        
+        Input strings to compare.
+
     Returns
     -------
     int
-        Edit distance (0 = identical strings)
-        
-    Complexity
-    ----------
-    Time: O(len(s1) * len(s2))
-    Space: O(len(s2))
-        
-    Examples
-    --------
-    >>> levenshtein_distance("kitten", "sitting")
-    3
-    
-    >>> levenshtein_distance("hello", "hello")
-    0
+        Edit distance (0 indicates identical strings).
+
+    Notes
+    -----
+    Time Complexity: O(len(s1) * len(s2))
+    Space Complexity: O(min(len(s1), len(s2)))
     """
-    # Ensure s1 is the longer string (optimization)
+    # Optimization: Ensure s1 is the longer string to minimize row size
     if len(s1) < len(s2):
         return levenshtein_distance(s2, s1)
     
-    # Empty string edge case
+    # Edge case: Transformation to empty string
     if len(s2) == 0:
         return len(s1)
     
@@ -47,10 +39,11 @@ def levenshtein_distance(s1: str, s2: str) -> int:
     for i, c1 in enumerate(s1):
         current_row = [i + 1]
         for j, c2 in enumerate(s2):
-            # Cost of insertions, deletions, or substitutions
+            # Calculate operation costs
             insertions = previous_row[j + 1] + 1
             deletions = current_row[j] + 1
             substitutions = previous_row[j] + (c1 != c2)
+            
             current_row.append(min(insertions, deletions, substitutions))
         previous_row = current_row
     
@@ -60,27 +53,18 @@ def levenshtein_distance(s1: str, s2: str) -> int:
 def normalized_levenshtein_similarity(s1: str, s2: str) -> float:
     """
     Calculate normalized Levenshtein similarity score (0-1 scale).
-    
-    Converts edit distance to similarity by normalizing against longer string:
-    similarity = 1 - (distance / max_length)
-    
+
+    Formula: similarity = 1 - (distance / max_length)
+
     Parameters
     ----------
     s1, s2 : str
-        Input strings to compare
-        
+        Input strings to compare.
+
     Returns
     -------
     float
-        Similarity score: 1.0 = identical, 0.0 = completely different
-        
-    Examples
-    --------
-    >>> normalized_levenshtein_similarity("hello", "hello")
-    1.0
-    
-    >>> normalized_levenshtein_similarity("hello", "hallo")
-    0.8
+        Similarity score where 1.0 is identical and 0.0 is completely different.
     """
     if not s1 or not s2:
         return 0.0
@@ -97,38 +81,32 @@ def normalized_levenshtein_similarity(s1: str, s2: str) -> float:
 
 def jaccard_similarity(s1: str, s2: str) -> float:
     """
-    Calculate Jaccard similarity at word level.
-    
-    Measures overlap of word sets:
-    jaccard = |intersection| / |union|
-    
+    Calculate Jaccard similarity at the word level.
+
+    Measures the overlap between two sets of words using the formula:
+    J(A, B) = |A ∩ B| / |A ∪ B|
+
     Parameters
     ----------
     s1, s2 : str
-        Input strings (whitespace-delimited words)
-        
+        Input strings (whitespace-delimited words).
+
     Returns
     -------
     float
-        Jaccard similarity (0-1): 1.0 = identical word sets
-        
-    Examples
-    --------
-    >>> jaccard_similarity("quick brown fox", "quick brown dog")
-    0.5  # 2/4 words match
-    
-    >>> jaccard_similarity("hello world", "world hello")
-    1.0  # same word set, order ignored
+        Jaccard similarity score (0.0 to 1.0), where 1.0 indicates identical word sets.
     """
     if not s1 or not s2:
         return 0.0
     
+    # Tokenize strings into unique word sets
     words1 = set(s1.split())
     words2 = set(s2.split())
     
     if not words1 or not words2:
         return 0.0
     
+    # Calculate set operations
     intersection = words1 & words2
     union = words1 | words2
     
@@ -137,25 +115,21 @@ def jaccard_similarity(s1: str, s2: str) -> float:
 
 def sequence_matcher_similarity(s1: str, s2: str) -> float:
     """
-    Calculate similarity using Python's SequenceMatcher (difflib).
-    
-    Uses longest contiguous matching subsequence algorithm, useful for
+    Calculate similarity using Python's built-in SequenceMatcher (difflib).
+
+    This uses the Ratcliff/Obershelp algorithm to compute a similarity score
+    based on the longest contiguous matching subsequence. It is useful for 
     detecting rearranged or reordered content.
-    
+
     Parameters
     ----------
     s1, s2 : str
-        Input strings to compare
-        
+        Input strings to compare.
+
     Returns
     -------
     float
-        Similarity ratio (0-1): 1.0 = identical sequences
-        
-    Examples
-    --------
-    >>> sequence_matcher_similarity("machine learning", "learning machine")
-    0.875  # High score despite word reordering
+        Similarity ratio (0.0 to 1.0), where 1.0 indicates identical sequences.
     """
     if not s1 or not s2:
         return 0.0
