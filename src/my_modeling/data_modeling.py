@@ -1,12 +1,11 @@
 import os
-import json
 import joblib
 import pandas as pd
 import numpy as np
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict
 
 # Negative sampling per query to handle imbalanced data
 def sample_negatives_per_query(df: pd.DataFrame, features: List[str], target: str = 'label', k_negatives: int = 15, hard_ratio: float = 0.6, random_seed: int = 42) -> pd.DataFrame:

@@ -60,14 +60,26 @@ def normalize_text(text: str, remove_stopwords: bool = True) -> str:
 
 def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     """
-    Parse BibTeX author field into normalized author list.
-    IMPROVED: Preserves hyphens in names (e.g., "Cyr-Racine").
+    Parse a BibTeX author string into normalized short forms and name tokens.
+
+    Parameters
+    ----------
+    author_field : str
+        Raw author string (e.g., "Smith, John and Doe, Jane") or list of strings.
+
+    Returns
+    -------
+    Dict[str, List[str]]
+        Dictionary containing:
+        - 'short_forms': List of "Lastname I" strings.
+        - 'name_tokens': List of lists containing parsed name parts.
     """
     if not author_field:
         return {"short_forms": [], "name_tokens": []}
     
     authors = []
 
+    # 1. Split author string into individual authors
     if isinstance(author_field, str):
         authors = re.split(r'\s+(?:and\s+)+', author_field, flags=re.IGNORECASE)
     elif isinstance(author_field, list):
@@ -78,13 +90,17 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     short_forms = []
     all_name_tokens = []
 
+    # 2. Process and normalize each author
     for auth_str in authors:
+        # Remove LaTeX grouping braces
         auth_str = auth_str.replace('{', '').replace('}', '')
         
+        # Parse name components (First, Middle, Last)
         name = HumanName(auth_str)
         
         def clean_name_part(part):
             if not part: return ""
+            # Keep only letters, spaces, and hyphens; lowercase
             clean = re.sub(r'[^a-z\s\-]', '', part.lower())
             return clean.strip()
 
@@ -93,9 +109,11 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
         
         first_initial = first_name[0] if first_name else ""
         
+        # 3. Generate short form (e.g., "cyr-racine f")
         formatted_short = f"{last_name} {first_initial}".strip()
         short_forms.append(formatted_short)
 
+        # 4. Collect tokens for granular matching
         raw_tokens = [name.first, name.middle, name.last]
         tokens = [clean_name_part(t) for t in raw_tokens if t]
         all_name_tokens.append(tokens)
