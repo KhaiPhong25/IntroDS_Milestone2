@@ -42,11 +42,6 @@ def normalize_text(text: str, remove_stopwords: bool = True) -> str:
     # Step 4: Remove special LaTeX characters but keep space
     text = text.replace('{', '').replace('}', '').replace('$', '').replace('~', ' ')
     
-    # --- FIX QUAN TRỌNG CHO TITLE ---
-    # Thay vì xóa bay dấu câu (khiến "Data-Science" thành "datascience"),
-    # ta thay thế chúng bằng khoảng trắng.
-    # Giữ lại chữ cái, số, và khoảng trắng. 
-    # Nếu bạn muốn giữ gạch nối cho Title, thêm \- vào trong ngoặc vuông []
     text = re.sub(r'[^a-z0-9\s\-]', ' ', text)
     
     # Step 5: Tokenize
@@ -54,15 +49,12 @@ def normalize_text(text: str, remove_stopwords: bool = True) -> str:
     
     cleaned_tokens = []
     for token in tokens:
-        # Lemmatize trước hoặc sau stopword check đều được, 
-        # nhưng check stopword trước sẽ nhanh hơn.
         if remove_stopwords and token in STOP_WORDS:
             continue
             
         lemma = LEMMATIZER.lemmatize(token)
         cleaned_tokens.append(lemma)
 
-    # Join lại và xóa khoảng trắng thừa
     return " ".join(cleaned_tokens).strip()
 
 
@@ -77,7 +69,6 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     authors = []
 
     if isinstance(author_field, str):
-        # Split by 'and' (case-insensitive)
         authors = re.split(r'\s+(?:and\s+)+', author_field, flags=re.IGNORECASE)
     elif isinstance(author_field, list):
         authors = author_field
@@ -88,33 +79,23 @@ def extract_author_list(author_field: str) -> Dict[str, List[str]]:
     all_name_tokens = []
 
     for auth_str in authors:
-        # Clean rác LaTeX trong tên trước khi parse
         auth_str = auth_str.replace('{', '').replace('}', '')
         
-        # Parse tên
         name = HumanName(auth_str)
-
-        # --- FIX QUAN TRỌNG CHO TÊN TÁC GIẢ ---
-        # Logic cũ: translate(str.maketrans('', '', string.punctuation)) -> Xóa dấu gạch nối
-        # Logic mới: Dùng Regex giữ lại chữ cái và dấu gạch nối (-)
         
         def clean_name_part(part):
             if not part: return ""
-            # Giữ a-z, khoảng trắng và dấu gạch nối
             clean = re.sub(r'[^a-z\s\-]', '', part.lower())
             return clean.strip()
 
         last_name = clean_name_part(name.last)
         first_name = clean_name_part(name.first)
         
-        # Lấy chữ cái đầu (cẩn thận nếu first_name rỗng)
         first_initial = first_name[0] if first_name else ""
         
-        # Format: "cyr-racine f"
         formatted_short = f"{last_name} {first_initial}".strip()
         short_forms.append(formatted_short)
 
-        # Token list: Cũng áp dụng logic giữ gạch nối
         raw_tokens = [name.first, name.middle, name.last]
         tokens = [clean_name_part(t) for t in raw_tokens if t]
         all_name_tokens.append(tokens)
@@ -166,8 +147,6 @@ def clean_bibtex_entry(entry: Dict[str, str]) -> Dict[str, Any]:
     cleaned['normalized_year'] = normalize_year(entry.get('year', ''))
     
     # Helper for fast filtering: first author's last name
-    # Lấy token cuối cùng của tên đầu tiên trong danh sách short_forms
-    # VD: "cyr-racine f" -> "cyr-racine"
     if cleaned['normalized_authors']:
         first_auth_str = cleaned['normalized_authors'][0]
         cleaned['first_author_last'] = first_auth_str.split()[0] if first_auth_str else ""

@@ -183,6 +183,5 @@ def feature_engineering(df):
         "Year_Diff"
     ]
     
-    # Chỉ lấy các cột tồn tại
     existing_cols = [c for c in feature_cols if c in df_feat.columns]
     return df_feat[existing_cols]
