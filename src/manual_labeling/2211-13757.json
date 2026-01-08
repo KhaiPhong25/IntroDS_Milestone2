@@ -1,6 +1,6 @@
 [
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "pointr",
     "bib_title": "pointr diverse point cloud completion geometry-aware transformer",
@@ -2016,7 +2016,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "if-net",
     "bib_title": "implicit function feature space 3d shape reconstruction completion",
@@ -2688,7 +2688,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "patchcomplete",
     "bib_title": "patchcomplete learning multi-resolution patch prior 3d shape completion unseen category",
@@ -4032,7 +4032,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "cgan",
     "bib_title": "multimodal shape completion via conditional generative adversarial network",
@@ -6048,7 +6048,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "shapeformer",
     "bib_title": "shapeformer transformer-based shape completion via sparse representation",
@@ -6720,7 +6720,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "pvd",
     "bib_title": "3d shape generation completion point-voxel diffusion",
@@ -7392,7 +7392,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "functa",
     "bib_title": "data functa data point function treat like one",
@@ -8064,7 +8064,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "deepsdf",
     "bib_title": "deepsdf learning continuous signed distance function shape representation",
@@ -9408,7 +9408,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "nglod",
     "bib_title": "neural geometric level detail real-time rendering implicit 3d shape",
@@ -10752,7 +10752,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "gensdf",
     "bib_title": "gensdf two-stage learning generalizable signed distance function",
@@ -14784,7 +14784,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "score_functions",
     "bib_title": "generative modeling estimating gradient data distribution",
@@ -16128,7 +16128,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "ddpm",
     "bib_title": "denoising diffusion probabilistic model",
@@ -17472,7 +17472,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "improved_ddpm",
     "bib_title": "improved denoising diffusion probabilistic model",
@@ -18144,7 +18144,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "diffusion_beat_gans",
     "bib_title": "diffusion model beat gans image synthesis",
@@ -18816,7 +18816,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "dalle2",
     "bib_title": "hierarchical text-conditional image generation clip latents",
@@ -20160,7 +20160,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "cascaded-point-completion",
     "bib_title": "cascaded refinement network point cloud completion",
@@ -22176,7 +22176,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "attention",
     "bib_title": "attention need",
@@ -25536,7 +25536,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "lion",
     "bib_title": "lion latent point diffusion model 3d shape generation",
@@ -26208,7 +26208,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "shapegan",
     "bib_title": "adversarial generation continuous implicit shape representation",
@@ -26880,7 +26880,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "dreamfusion",
     "bib_title": "dreamfusion text-to-3d using 2d diffusion",
@@ -27552,7 +27552,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "3DiM",
     "bib_title": "novel view synthesis diffusion model",
@@ -28224,7 +28224,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "get3d",
     "bib_title": "get3d generative model high quality 3d textured shape learned image",
@@ -28896,7 +28896,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "wavelet",
     "bib_title": "neural wavelet-domain diffusion 3d shape generation",
@@ -31584,7 +31584,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "conv_occ",
     "bib_title": "convolutional occupancy network",
@@ -32928,7 +32928,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "siren",
     "bib_title": "implicit neural representation periodic activation function",
@@ -35616,7 +35616,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "autosdf",
     "bib_title": "autosdf shape prior 3d completion reconstruction generation",
@@ -36960,7 +36960,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "nash2021generating",
     "bib_title": "generating image sparse representation",
@@ -37632,7 +37632,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "spectralgan",
     "bib_title": "spectral normalization generative adversarial network",
@@ -38304,7 +38304,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "largegan",
     "bib_title": "large scale gan training high fidelity natural image synthesis",
@@ -38976,7 +38976,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "pc-diffusion",
     "bib_title": "diffusion probabilistic model 3d point cloud generation",
@@ -42336,7 +42336,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "mod-periodic",
     "bib_title": "modulated periodic activation generalizable local functional representation",
@@ -43008,7 +43008,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "sohl2015deep",
     "bib_title": "deep unsupervised learning using nonequilibrium thermodynamics",
@@ -43680,7 +43680,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "pointflow",
     "bib_title": "pointflow 3d point cloud generation continuous normalizing flow",
@@ -48384,7 +48384,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "prior-hole3",
     "bib_title": "d2c diffusion-decoding model few-shot conditional generation",
@@ -50400,7 +50400,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "acronym",
     "bib_title": "acronym large-scale grasp dataset based simulation",
@@ -56448,7 +56448,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "nerfsupervision",
     "bib_title": "nerf-supervision learning dense object descriptor neural radiance field",
@@ -57120,7 +57120,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "voxfields",
     "bib_title": "neural sparse voxel field",

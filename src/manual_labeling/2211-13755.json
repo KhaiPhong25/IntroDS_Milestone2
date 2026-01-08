@@ -588,7 +588,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "zhong2018open",
     "bib_title": "open-world stereo video matching deep rnn",
@@ -4704,7 +4704,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Lai2019bridging",
     "bib_title": "bridging stereo matching optical flow via spatiotemporal correspondence",
@@ -6468,7 +6468,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "GANet",
     "bib_title": "ga-net guided aggregation net end-to-end stereo matching",
@@ -8232,7 +8232,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "segstereo",
     "bib_title": "segstereo exploiting semantic information disparity estimation",
@@ -8820,7 +8820,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "HSM",
     "bib_title": "hierarchical deep stereo matching high-resolution image",
@@ -14112,7 +14112,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "wasserstein",
     "bib_title": "wasserstein distance stereo disparity estimation",
@@ -15288,7 +15288,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "PSMNet",
     "bib_title": "pyramid stereo matching network",
@@ -15876,7 +15876,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "GWCNet",
     "bib_title": "group-wise correlation stereo network",
@@ -16464,7 +16464,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "LEAStereo",
     "bib_title": "hierarchical neural architecture search deep stereo matching",
@@ -17640,7 +17640,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "PDS",
     "bib_title": "practical deep stereo pd toward applications-friendly deep stereo matching",
@@ -18228,7 +18228,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "DeepPruner",
     "bib_title": "deeppruner learning efficient stereo matching via differentiable patchmatch",
@@ -18816,7 +18816,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "CFNet",
     "bib_title": "cfnet cascade fused cost volume robust stereo matching",
@@ -19992,7 +19992,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "coex",
     "bib_title": "correlate-and-excite real-time stereo matching via guided cost volume excitation",
@@ -21756,7 +21756,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "edgestereo",
     "bib_title": "edgestereo context integrated residual pyramid network stereo matching",
@@ -24108,7 +24108,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "TartanAir",
     "bib_title": "tartanair dataset push limit visual slam",
@@ -24696,7 +24696,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "StereoNet",
     "bib_title": "stereonet guided hierarchical refinement real-time edge-aware depth prediction",
@@ -25284,7 +25284,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "ACVNet",
     "bib_title": "attention concatenation volume accurate efficient stereo matching",
@@ -25872,7 +25872,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "AANet",
     "bib_title": "aanet adaptive aggregation network efficient stereo matching",
@@ -27048,7 +27048,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "SMDNet",
     "bib_title": "smd-nets stereo mixture density network",
@@ -28224,7 +28224,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "BI3D",
     "bib_title": "bi3d stereo depth estimation via binary classification",
@@ -29400,7 +29400,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "CRL",
     "bib_title": "cascade residual learning two-stage convolutional neural network stereo matching",
@@ -34104,7 +34104,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "pytorch",
     "bib_title": "pytorch imperative style high-performance deep learning library",
@@ -36456,7 +36456,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "flow2stereo",
     "bib_title": "flow2stereo effective self-supervised learning optical flow stereo matching",
@@ -38808,7 +38808,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "neuralrecon",
     "bib_title": "neuralrecon real-time coherent 3d reconstruction monocular video",
@@ -40572,7 +40572,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "teed2021droid",
     "bib_title": "droid-slam deep visual slam monocular stereo rgb-d camera",
@@ -41748,7 +41748,7 @@
     "arxiv_year": "2014"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "raft",
     "bib_title": "raft recurrent all-pairs field transforms optical flow",
@@ -42924,7 +42924,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "deepmvs",
     "bib_title": "deepmvs learning multi-view stereopsis",
@@ -47040,7 +47040,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "tan2021efficientnetv2",
     "bib_title": "efficientnetv2 smaller model faster training",
@@ -47628,7 +47628,7 @@
     "arxiv_year": "2014"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "mobilenetv2",
     "bib_title": "mobilenetv2 inverted residual linear bottleneck",
@@ -49980,7 +49980,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "softsplat",
     "bib_title": "softmax splatting video frame interpolation",
@@ -52332,7 +52332,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "eigen2014depth",
     "bib_title": "depth map prediction single image using multi-scale deep network",
@@ -53508,7 +53508,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "CREStereo",
     "bib_title": "practical stereo matching via cascaded recurrent network adaptive correlation",
@@ -54684,7 +54684,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "SENSE",
     "bib_title": "sense shared encoder network scene-flow estimation",
