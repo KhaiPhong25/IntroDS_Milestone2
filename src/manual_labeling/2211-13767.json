@@ -612,7 +612,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Mbeng2019",
     "bib_title": "quantum annealing journey digitalization control hybrid quantum variational scheme",
@@ -1836,7 +1836,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Rezakhani2009",
     "bib_title": "quantum adiabatic brachistochrone",
@@ -6120,7 +6120,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Petiziol2018",
     "bib_title": "fast adiabatic evolution oscillating initial hamiltonians",
@@ -7344,7 +7344,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Brady2021",
     "bib_title": "behavior analog quantum algorithm",
@@ -7956,7 +7956,7 @@
     "arxiv_year": "2010"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Farhi2016",
     "bib_title": "quantum supremacy quantum approximate optimization algorithm",
@@ -8568,7 +8568,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "farhi2014quantum",
     "bib_title": "quantum approximate optimization algorithm",
@@ -9180,7 +9180,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "farhi2000quantum",
     "bib_title": "quantum computation adiabatic evolution",
@@ -9792,7 +9792,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "kim2017holographic",
     "bib_title": "holographic quantum simulation",
@@ -11016,7 +11016,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "wiese2013ultracold",
     "bib_title": "ultracold quantum gas lattice system quantum simulation lattice gauge theory",
@@ -12240,7 +12240,7 @@
     "arxiv_year": "1998"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "preskill2018quantum",
     "bib_title": "quantum computing nisq era beyond",
@@ -12852,7 +12852,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Lloyd2018",
     "bib_title": "quantum approximate optimization computationally universal",
@@ -14076,7 +14076,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "brown2010using",
     "bib_title": "using quantum computer quantum simulation",
@@ -15912,7 +15912,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "gustafson2019quantum",
     "bib_title": "quantum simulation scattering quantum ising model",
@@ -16524,7 +16524,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "chen2010quantum",
     "bib_title": "quantum simulation heisenberg spin chain next-nearest-neighbor interaction coupled cavity",
@@ -17136,7 +17136,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "edwards2010quantum",
     "bib_title": "quantum simulation phase diagram transverse-field ising model three atomic spin",
@@ -17748,7 +17748,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "aharonov2003adiabatic",
     "bib_title": "adiabatic quantum state generation statistical zero knowledge",
@@ -20196,7 +20196,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "weimer2011digital",
     "bib_title": "digital quantum simulation rydberg atom",
@@ -26316,7 +26316,7 @@
     "arxiv_year": "2010"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "kaelbling1996reinforcement",
     "bib_title": "reinforcement learning survey",
@@ -31212,7 +31212,7 @@
     "arxiv_year": "2013"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Kadowaki_1998",
     "bib_title": "quantum annealing transverse ising model",
@@ -36720,7 +36720,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "mcclean2018barren",
     "bib_title": "barren plateau quantum neural network training landscape",
@@ -40392,7 +40392,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Bittel_2021",
     "bib_title": "training variational quantum algorithm np-hard",
@@ -41616,7 +41616,7 @@
     "arxiv_year": "2013"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Muthukrishnan2015",
     "bib_title": "diabatic trump adiabatic quantum optimization",
@@ -42228,7 +42228,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Bapat2018",
     "bib_title": "bang-bang control design principle classical quantum optimization algorithm",

@@ -2496,7 +2496,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Calore:2020tjw",
     "bib_title": "bound axionlike particle diffuse supernova flux",
@@ -3120,7 +3120,7 @@
     "arxiv_year": "2001"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Siegert:2019tus",
     "bib_title": "constraint positron annihilation kinematics inner galaxy",
@@ -5616,7 +5616,7 @@
     "arxiv_year": "2011"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "DeRocco:2019njg",
     "bib_title": "observable signature dark photon supernova",
@@ -7488,7 +7488,7 @@
     "arxiv_year": "2011"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Ferreira:2022egk",
     "bib_title": "direct detection experiment constrain axionlike particle coupled electron",
@@ -8112,7 +8112,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Ferreira:2022xlw",
     "bib_title": "strong supernova bound alp quantum loop",
@@ -8736,7 +8736,7 @@
     "arxiv_year": "2012"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Caputo:2022mah",
     "bib_title": "low-energy supernova severely constrain radiative particle decay",
@@ -9360,7 +9360,7 @@
     "arxiv_year": "1993"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Caputo:2022rca",
     "bib_title": "radiative transfer star feebly interacting boson",
@@ -11232,7 +11232,7 @@
     "arxiv_year": "2017"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Bollig:2020xdr",
     "bib_title": "muon supernova implication axion-muon coupling",
@@ -11856,7 +11856,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Lucente:2020whw",
     "bib_title": "heavy axion-like particle core-collapse supernova constraint impact explosion mechanism",
@@ -12480,7 +12480,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Lucente:2022vuo",
     "bib_title": "axion signature supernova explosion nucleon electric-dipole portal",
@@ -13104,7 +13104,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Lucente:2021hbp",
     "bib_title": "supernova bound axionlike particle coupled electron",
@@ -13728,7 +13728,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Craig:2018kne",
     "bib_title": "photophobic alp",
@@ -18096,7 +18096,7 @@
     "arxiv_year": "2002"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Raffelt:2011ft",
     "bib_title": "mev mass frontier axion physic",
@@ -21216,7 +21216,7 @@
     "arxiv_year": "2006"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Stoica:2009zh",
     "bib_title": "pion mass effect axion emission neutron star nn bremsstrahlung process",
@@ -23088,7 +23088,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Chang:2018rso",
     "bib_title": "supernova 1987a constraint sub-gev dark sector millicharged particle qcd axion axion-like particle",
@@ -23712,7 +23712,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Chang:1993gm",
     "bib_title": "hadronic axion window big bang nucleosynthesis",
@@ -31200,7 +31200,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Carenza:2019pxu",
     "bib_title": "improved axion emissivity supernova via nucleon-nucleon bremsstrahlung",
@@ -33072,7 +33072,7 @@
     "arxiv_year": "2018"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Giannotti:2005tn",
     "bib_title": "nucleon-nucleon bremsstrahlung emission massive axions",
@@ -38688,7 +38688,7 @@
     "arxiv_year": "1996"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Fischer:2021jfm",
     "bib_title": "observable signature enhanced axion emission protoneutron star",
@@ -46800,7 +46800,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Priya:2017bmm",
     "bib_title": "diffuse neutrino luminous dark supernova prospect upcoming detector 10 kt scale",
@@ -51792,7 +51792,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Sung:2019xie",
     "bib_title": "new constraint supernova explosion light particle beyond standard model",
@@ -54912,7 +54912,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "Balaji:2022noj",
     "bib_title": "improved stellar limit light cp-even scalar",

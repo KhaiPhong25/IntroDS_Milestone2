@@ -1176,7 +1176,7 @@
     "arxiv_year": "2007"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "potts2020magnon",
     "bib_title": "magnon-phonon quantum correlation thermometry",
@@ -1764,7 +1764,7 @@
     "arxiv_year": "2007"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "potts2021dynamical",
     "bib_title": "dynamical backaction magnomechanics",
@@ -2940,7 +2940,7 @@
     "arxiv_year": "1999"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "zhang2014strongly",
     "bib_title": "strongly coupled magnons cavity microwave photon",
@@ -3528,7 +3528,7 @@
     "arxiv_year": "2020"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "zhang2015magnon",
     "bib_title": "magnon dark mode gradient memory",
@@ -4704,7 +4704,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "shen2022mechanical",
     "bib_title": "mechanical bistability kerr-modified cavity magnomechanics",
@@ -8820,7 +8820,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "lecocq2015quantum",
     "bib_title": "quantum nondemolition measurement nonclassical state massive object",
@@ -10584,7 +10584,7 @@
     "arxiv_year": "2016"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "chan2011laser",
     "bib_title": "laser cooling nanomechanical oscillator quantum ground state",
@@ -18228,7 +18228,7 @@
     "arxiv_year": "1999"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "li2019entangling",
     "bib_title": "entangling two magnon mode via magnetostrictive interaction",
@@ -19404,7 +19404,7 @@
     "arxiv_year": "2012"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "li2018magnon",
     "bib_title": "magnon-photon-phonon entanglement cavity magnomechanics",
@@ -19992,7 +19992,7 @@
     "arxiv_year": "1999"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "li2021quantum",
     "bib_title": "quantum network magnonic mechanical node",
@@ -21168,7 +21168,7 @@
     "arxiv_year": "2013"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "asjad2022magnon",
     "bib_title": "magnon squeezing enhanced ground-state cooling cavity magnomechanics",
@@ -22344,7 +22344,7 @@
     "arxiv_year": "2012"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "sarma2021cavity",
     "bib_title": "cavity magnomechanical storage retrieval quantum state",
@@ -24696,7 +24696,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "lachance2019hybrid",
     "bib_title": "hybrid quantum system based magnonics",
@@ -25872,7 +25872,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "cohadon1999cooling",
     "bib_title": "cooling mirror radiation pressure",
@@ -29400,7 +29400,7 @@
     "arxiv_year": "2007"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "wang2019nonreciprocity",
     "bib_title": "nonreciprocity unidirectional invisibility cavity magnonics",
@@ -30576,7 +30576,7 @@
     "arxiv_year": "2022"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "harder2018level",
     "bib_title": "level attraction due dissipative magnon-photon coupling",
@@ -32928,7 +32928,7 @@
     "arxiv_year": "2013"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "clerk2008back",
     "bib_title": "back-action evasion squeezing mechanical resonator using cavity detector",
@@ -38220,7 +38220,7 @@
     "arxiv_year": "2015"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "kanari2021can",
     "bib_title": "displacemon device test objective collapse model",
@@ -38808,7 +38808,7 @@
     "arxiv_year": "2019"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "rodrigues2019coupling",
     "bib_title": "coupling microwave photon mechanical resonator using quantum interference",
@@ -39396,7 +39396,7 @@
     "arxiv_year": "2012"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "ockeloen2016quantum",
     "bib_title": "quantum backaction evading measurement collective mechanical mode",
@@ -41748,7 +41748,7 @@
     "arxiv_year": "2021"
   },
   {
-    "label": 0,
+    "label": 1,
     "score": 1.0,
     "bib_key": "streib2019magnon",
     "bib_title": "magnon-phonon interaction magnetic insulator",
