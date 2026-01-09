@@ -37,9 +37,7 @@ class FileNode:
 
     def is_leaf(self) -> bool:
         return self.node_type in {
-            "sentence", "table", "figure",
-            "itemize", "enumerate", "listing",
-            "math"
+            "sentence", "table", "figure", "listing", "math"
         }
 
     def __repr__(self):

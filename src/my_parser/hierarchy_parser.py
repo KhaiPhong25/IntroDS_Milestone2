@@ -2,7 +2,10 @@ from .parser_utilities import *
 from .file_node import *
 
 def normalize_non_leaf_sections(node: FileNode) -> None:
-    if node.node_type in {"section", "subsection", "subsubsection"}:
+    if node.node_type in {
+        "part", "chapter", "appendix"
+        "section", "subsection", "subsubsection"
+    }:
         if not node.children:
             node.add_child(FileNode(node_type="sentence", content=""))
     for child in node.children:
@@ -59,7 +62,6 @@ def parse_plain_tex(
         t = re.sub(r"\\noindent", "", t)
         t = re.sub(r"\\item\{.*?\}", "", t)
         
-        # --- FIX: Target ONLY specific font commands, preserve math (\mu, \xi, etc.) ---
         # Removes \rm, \it, \bf, \tt, \sl followed by a word boundary
         t = re.sub(r"\\(rm|it|bf|tt|sl)\s+", "", t)
         
@@ -236,7 +238,6 @@ def parse_plain_tex(
                                         fig_content = text[cl_brace_start+1:brace_end_3]
                                         final_cursor = brace_end_3 + 1
                         
-                        # --- Update: Explicitly Strip \centerline inside the extracted content ---
                         # Sometimes content is extracted as { \centerline{...} } or similar if parsing was loose
                         # But here fig_content is already the inner part if we hit Case B.
                         # If we hit Case A, fig_content might be "\centerline{...}" if the user wrote \ifig{}{ \centerline{} }
@@ -317,7 +318,6 @@ def parse_plain_tex(
                                         fig_content = text[cl_brace_start+1:brace_end_2]
                                         final_cursor = brace_end_2 + 1
                         
-                        # --- Update: Explicitly Strip \centerline inside the extracted content ---
                         # Sometimes content is extracted as { \centerline{...} } or similar if parsing was loose
                         # But here fig_content is already the inner part if we hit Case B.
                         # If we hit Case A, fig_content might be "\centerline{...}" if the user wrote \ifig{}{ \centerline{} }
@@ -624,7 +624,15 @@ def parse_tex_files(version_path: str, tex_files: List[str]) -> FileNode:
             sec = parse_section_line(line)
             if sec:
                 level, title, trailing = sec
-                level_map = {"section": 1, "subsection": 2, "subsubsection": 3, "paragraph": 4}
+                level_map = {
+                    "part": 1,
+                    "chapter": 2,
+                    "section": 3,
+                    "appendix": 3,
+                    "subsection": 4,
+                    "subsubsection": 5,
+                    "paragraph": 6
+                }
                 depth = level_map[level]
                 # Paragraphs should not nest inside previous paragraphs; keep them as siblings.
                 target_depth = depth if level != "paragraph" else depth - 1
@@ -638,6 +646,195 @@ def parse_tex_files(version_path: str, tex_files: List[str]) -> FileNode:
                 if trailing:
                     for sent in split_sentences(trailing):
                         current_stack[-1].add_child(FileNode(node_type="sentence", content=sent))
+                continue
+
+            incs = INPUT_PATTERN.findall(line)
+            if incs:
+                _flush_buffer()
+                for inc_raw in incs:
+                    inc = normalize_tex_name(inc_raw)
+                    if inc not in raw_map:
+                        if inc.rfind('\\') > -1:
+                            inc = inc[inc.rfind('\\') + 1 : ]
+                        elif inc.rfind('/') > -1:
+                            inc = inc[inc.rfind('/') + 1 : ]
+                        if inc not in raw_map:
+                            continue
+                    elif inc in include_stack:
+                        continue
+                    _parse_file(inc, True, include_stack + [tex_file])
+                continue
+
+            if in_block_env:
+                block_buffer.append(line)
+                end_pat = BLOCK_END_MAP.get(in_block_env)
+                if end_pat and end_pat.search(line):
+                    node_type = "listing" if in_block_env in {"listing", "lstlisting"} else in_block_env
+                    if in_block_env in {"itemize", "enumerate"}:
+                        try:
+                            items = "\n".join(block_buffer).split("\\item")[1:]  # Skip before first \item
+                            items[-1] = items[-1].split(r"\end{" + in_block_env + "}")[0]
+                        except:
+                            raise IndexError(block_buffer)
+                        item_contents = []
+                        for item in items:
+                            for subline in item.splitlines():
+                                item_contents.append(subline.strip())
+
+                        list_node = FileNode(node_type = node_type)
+                        text_in_block_buffer: List[str] = []
+                        math_in_block = None
+                        math_buffer: List[str] = []
+
+                        for item in item_contents:
+                            # Handle math environments
+                            if math_in_block:
+                                math_buffer.append(item)
+                                end_math_in_block = None
+                                if math_in_block == "$$":
+                                    if item.count("$$"):
+                                        if item.count("$$") % 2 == 1 or item.rstrip().endswith("$$"):
+                                            end_math_in_block = True
+                                elif math_in_block == r"\[":
+                                    if MATH_INLINE_BRACKET_END.search(item):
+                                        end_math_in_block = True
+                                else:
+                                    end_in_block_re = MATH_ENV_END.get(math_in_block)
+                                    if end_in_block_re and end_in_block_re.search(item):
+                                        end_math_in_block = True
+
+                                if end_math_in_block:
+                                    math_in_block_content = "\n".join(math_buffer)
+                                    list_node.add_child(FileNode(node_type="math", content=math_in_block_content))
+                                    trailing_text = ""
+                                    if math_in_block == "$$":
+                                        parts = item.rsplit("$$", 1)
+                                        trailing_text = parts[1].strip() if len(parts) == 2 else ""
+                                    elif math_in_block == r"\[":
+                                        idx = item.rfind(r"\]")
+                                        if idx != -1:
+                                            trailing_text = item[idx + 2 :].strip()
+                                    else:
+                                        end_in_block_re = MATH_ENV_END.get(math_in_block)
+                                        if end_in_block_re:
+                                            m_end = end_in_block_re.search(item)
+                                            if m_end:
+                                                trailing_text = item[m_end.end() :].strip()
+                                    if trailing_text:
+                                        for sent in split_sentences(trailing_text):
+                                            list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    math_buffer = []
+                                    math_in_block = None
+                                continue
+
+                            # Detect math starts (display)
+                            if item.count("$$") >= 2:
+                                if len(text_in_block_buffer) > 0:
+                                    in_block_text_chunk = " ".join(text_in_block_buffer).strip()
+                                    for sent in split_sentences(in_block_text_chunk):
+                                        list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    text_in_block_buffer = []
+
+                                parts = item.split("$$", 2)
+                                math_in_block_content = "$$" + parts[1] + "$$"
+                                list_node.add_child(FileNode(node_type="math", content=math_in_block_content))
+                                trailing = parts[2].strip()
+                                if trailing:
+                                    for sent in split_sentences(trailing):
+                                        list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                continue
+                            if "$$" in item:
+                                # Flush pending text
+                                if len(text_in_block_buffer) > 0:
+                                    in_block_text_chunk = " ".join(text_in_block_buffer).strip()
+                                    for sent in split_sentences(in_block_text_chunk):
+                                        list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    text_in_block_buffer = []
+
+                                math_in_block = "$$"
+                                math_buffer = [item]
+                                continue
+                            if MATH_INLINE_BRACKET_BEGIN.match(item):
+                                # Flush pending text
+                                if len(text_in_block_buffer) > 0:
+                                    in_block_text_chunk = " ".join(text_in_block_buffer).strip()
+                                    for sent in split_sentences(in_block_text_chunk):
+                                        list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    text_in_block_buffer = []
+
+                                math_buffer = [item]
+                                if MATH_INLINE_BRACKET_END.search(item):
+                                    math_in_block_content = "\n".join(math_buffer)
+                                    list_node.add_child(FileNode(node_type="math", content=math_in_block_content))
+                                    trailing_text = ""
+                                    idx = item.rfind(r"\]")
+                                    if idx != -1:
+                                        trailing_text = item[idx + 2 :].strip()
+                                    if trailing_text:
+                                        for sent in split_sentences(trailing_text):
+                                            list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    math_buffer = []
+                                    math_in_block = None
+                                else:
+                                    math_in_block = r"\["
+                                continue
+                            m_in_b_env = MATH_ENV_BEGIN.search(item)
+                            if m_in_b_env:
+                                # Flush pending text
+                                if len(text_in_block_buffer) > 0:
+                                    in_block_text_chunk = " ".join(text_in_block_buffer).strip()
+                                    for sent in split_sentences(in_block_text_chunk):
+                                        list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    text_in_block_buffer = []
+
+                                m_in_b_name = m_in_b_env.group(1)
+                                math_buffer = [item]
+                                end_math_in_block = MATH_ENV_END.get(m_in_b_name)
+                                if end_math_in_block and end_math_in_block.search(item):
+                                    math_in_block_content = "\n".join(math_buffer)
+                                    list_node.add_child(FileNode(node_type="math", content=math_in_block_content))
+                                    trailing_text = ""
+                                    m_end = end_math_in_block.search(item)
+                                    if m_end:
+                                        trailing_text = item[m_end.end() :].strip()
+                                    if trailing_text:
+                                        for sent in split_sentences(trailing_text):
+                                            list_node.add_child(FileNode(node_type="sentence", content=sent))
+                                    math_buffer = []
+                                    math_in_block = None
+                                else:
+                                    math_in_block = m_in_b_name
+                                continue
+
+                            # Normal sentence
+                            text_in_block_buffer.append(item)
+
+                        if len(text_in_block_buffer) > 0:
+                            in_block_text_chunk = " ".join(text_in_block_buffer).strip()
+                            for sent in split_sentences(in_block_text_chunk):
+                                list_node.add_child(FileNode(node_type="sentence", content=sent))
+                            text_in_block_buffer = []
+                            
+                        current_stack[-1].add_child(list_node)
+                    else:
+                        current_stack[-1].add_child(FileNode(node_type=node_type, content="\n".join(block_buffer)))
+                    block_buffer = []
+                    in_block_env = None
+                continue
+
+            m_block = BLOCK_BEGIN.search(line)
+            if m_block:
+                _flush_buffer()
+                env = m_block.group(1)
+                block_buffer = [line]
+                end_pat = BLOCK_END_MAP.get(env)
+                if end_pat and end_pat.search(line):
+                    node_type = "listing" if env in {"listing", "lstlisting"} else env
+                    current_stack[-1].add_child(FileNode(node_type=node_type, content="\n".join(block_buffer)))
+                    block_buffer = []
+                    in_block_env = None
+                else:
+                    in_block_env = env
                 continue
 
             # Handle math environments
@@ -734,49 +931,6 @@ def parse_tex_files(version_path: str, tex_files: List[str]) -> FileNode:
                     in_math = None
                 else:
                     in_math = env_name
-                continue
-
-            incs = INPUT_PATTERN.findall(line)
-            if incs:
-                _flush_buffer()
-                for inc_raw in incs:
-                    inc = normalize_tex_name(inc_raw)
-                    if inc not in raw_map:
-                        if inc.rfind('\\') > -1:
-                            inc = inc[inc.rfind('\\') + 1 : ]
-                        elif inc.rfind('/') > -1:
-                            inc = inc[inc.rfind('/') + 1 : ]
-                        if inc not in raw_map:
-                            continue
-                    elif inc in include_stack:
-                        continue
-                    _parse_file(inc, True, include_stack + [tex_file])
-                continue
-
-            if in_block_env:
-                block_buffer.append(line)
-                end_pat = BLOCK_END_MAP.get(in_block_env)
-                if end_pat and end_pat.search(line):
-                    node_type = "listing" if in_block_env in {"listing", "lstlisting"} else in_block_env
-                    current_stack[-1].add_child(FileNode(node_type=node_type, content="\n".join(block_buffer)))
-                    block_buffer = []
-                    in_block_env = None
-                continue
-
-            m_block = BLOCK_BEGIN.search(line)
-            if m_block:
-                _flush_buffer()
-                env = m_block.group(1)
-                block_buffer = [line]
-                end_pat = BLOCK_END_MAP.get(env)
-                if end_pat and end_pat.search(line):
-                    node_type = "listing" if env in {"listing", "lstlisting"} else env
-                    #
-                    current_stack[-1].add_child(FileNode(node_type=node_type, content="\n".join(block_buffer)))
-                    block_buffer = []
-                    in_block_env = None
-                else:
-                    in_block_env = env
                 continue
 
             if FIGURE_BEGIN.search(line):

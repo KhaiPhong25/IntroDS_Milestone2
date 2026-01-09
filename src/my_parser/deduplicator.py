@@ -1,4 +1,5 @@
 from .file_node import *
+from .parser_utilities import clean_latex_formatting
 import hashlib, re
 from collections import defaultdict
 from typing import Dict
@@ -25,6 +26,9 @@ def fast_normalize_and_id(root: FileNode, version: str):
         
         # --- 2. Normalization Logic ---
         node_type = getattr(node, "node_type", None)
+        if getattr(node, "content", None):
+            # Clean formatting BEFORE specific type handling
+            node.content = clean_latex_formatting(node.content)
         
         if node_type == "sentence":
             content = getattr(node, "content", "")
@@ -48,7 +52,11 @@ def fast_normalize_and_id(root: FileNode, version: str):
             parts.append(content)
             node.full_text = ' | '.join(parts)
 
-        elif node_type in {"itemize", "enumerate", "listing"}:
+        elif node_type in {"itemize", "enumerate"}:
+            node.content = f'{node.id[-6:]} | {node_type} | {len(getattr(node, "children", []))} items'
+            node.full_text = node.content
+
+        elif node_type in {"listing"}:
             content = getattr(node, "content", "")
             node.content = content
             node.full_text = content
@@ -65,7 +73,10 @@ def fast_normalize_and_id(root: FileNode, version: str):
             parts.append(content)
             node.full_text = ' | '.join(parts)
 
-        elif node_type in {"section", "subsection", "subsubsection", "paragraph", "document"}:
+        elif node_type in {
+            "chapter", "part", "appendix",
+            "section", "subsection", "subsubsection", "paragraph", "document"
+        }:
             node.content = (getattr(node, "title", None) or "").strip()
             node.full_text = node.content
         else:
@@ -110,89 +121,10 @@ def _compute_subtree_hash(node: FileNode) -> str:
 
 def deduplicate_tree(source_root: FileNode, content_index: Dict[str, FileNode]):
     """
-    Iterative Bottom-Up Deduplication.
-    
-    1. Traverses the tree leaves-first (Post-Order).
-    2. Computes hash for each node (Content + Children's Hashes).
-    3. If hash exists in `content_index`, marks node for replacement.
-    4. Updates parent's children pointers to point to existing nodes.
-    
-    The 'content_index' is populated during the first run (v1) and matched/updated
-    in subsequent runs (v2, v3...).
+    Iterative deduplication.
+    Traverses source_root; if a node matches one in content_index, 
+    swaps it in the parent's children list and stops traversing that branch.
     """
-    
-    # # 1. Build Processing Stack (Standard DFS to get Pre-Order)
-    # traversal_stack = [source_root]
-    # processing_stack = [] 
-    
-    # while traversal_stack:
-    #     node = traversal_stack.pop()
-    #     processing_stack.append(node)
-    #     if hasattr(node, "children") and node.children:
-    #         for child in node.children:
-    #             traversal_stack.append(child)
-                
-    # # 2. Process in Reverse (Bottom-Up: Leaves first, then Parents)
-    # # processing_stack is [Root, Child, Grandchild]
-    # # reversed is [Grandchild, Child, Root]
-    
-    # for node in reversed(processing_stack):
-    #     # A. Link Fixup
-    #     # Update children list if any child was marked as a duplicate
-    #     if hasattr(node, "children") and node.children:
-    #         new_children = []
-    #         changed = False
-    #         for child in node.children:
-    #             # If child has a canonical replacement, use it
-    #             if hasattr(child, "_canonical_ref"):
-    #                 canonical = child._canonical_ref
-    #                 new_children.append(canonical)
-    #                 if canonical is not child:
-    #                     changed = True
-    #             else:
-    #                 new_children.append(child)
-            
-    #         if changed:
-    #             node.children = new_children
-
-    #     # B. Compute Hash
-    #     # This uses the *current* children (which might be mixed V2 and V1 nodes)
-    #     current_hash = _compute_subtree_hash(node)
-    #     node._temp_hash = current_hash
-        
-    #     # C. Check Index
-    #     if current_hash in content_index:
-    #         # Duplicate Found!
-    #         existing_node = content_index[current_hash]
-            
-    #         # Mark this node to be replaced by the existing one
-    #         node._canonical_ref = existing_node
-            
-    #         # CRITICAL: Ensure the existing node has the hash cached 
-    #         # so that *this node's parent* can read it in step B above.
-    #         existing_node._temp_hash = current_hash
-    #     else:
-    #         # Unique Node (or First Version)
-    #         content_index[current_hash] = node
-    #         node._canonical_ref = node
-
-    # # Cleanup is optional but recommended. 
-    # # We remove _temp_hash to save memory, but _canonical_ref might be useful 
-    # # if the caller wants to know if the Root itself was deduplicated.
-    # for node in processing_stack:
-    #     if hasattr(node, "_temp_hash"): 
-    #         del node._temp_hash
-    #     # Clean up _canonical_ref on nodes that are NOT the root (internal nodes)
-    #     # We keep it on Root implicitly via the return/structure, 
-    #     # but the attribute itself can go.
-    #     if hasattr(node, "_canonical_ref"): 
-    #         del node._canonical_ref
-
-#     """
-#     Iterative deduplication.
-#     Traverses source_root; if a node matches one in content_index, 
-#     swaps it in the parent's children list and stops traversing that branch.
-#     """
     # Stack stores: (node, parent_node, index_in_parent_children)
     stack = [(source_root, None, -1)]
     
@@ -237,8 +169,7 @@ def serialize_node(roots_info: Dict[str, FileNode]) -> Dict:
     hierarchy = {}
 
     LEAF_TYPES = {
-        'sentence', 'math', 'figure', 'table',
-        'itemize', 'enumerate', 'listing', 'lstlisting'
+        'sentence', 'math', 'figure', 'table', 'listing'
     }
 
     for version_name, root in roots_info.items():
@@ -278,6 +209,9 @@ def serialize_node(roots_info: Dict[str, FileNode]) -> Dict:
                     # Structural -> Map ID to Title String
                     # Prefer full_text (normalized), fallback to title
                     text = getattr(node, "full_text", "") or getattr(node, "title", "") or ""
+                    if text == "":
+                        # For itemize/enumerate, use content
+                        text = getattr(node, "content", "") or text
                     elements[node_id] = text
                 else:
                     # Leaf -> Map ID to Content Dictionary
