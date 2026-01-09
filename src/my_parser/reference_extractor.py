@@ -344,111 +344,70 @@ def extract_references_from_tex_files(version_path: str, tex_files: List[str]) -
     return all_references
 
 
-def deduplicate_references_with_mapping(references: List[Dict[str, str]]) -> Tuple[List[Dict[str, str]], Dict[str, str]]:
-    """
-    Deduplicate references by grouping authors and merging similar entries.
-
-    Parameters
-    ----------
-    references : List[Dict[str, str]]
-        List of raw parsed reference dictionaries.
-
-    Returns
-    -------
-    Tuple[List[Dict[str, str]], Dict[str, str]]
-        1. List of deduplicated and merged reference dictionaries.
-        2. A mapping dictionary {old_key: canonical_key} for resolving citations.
-    """
-    groups = defaultdict(list)
+def generate_dedup_key(entry: Dict) -> str:
+    title = entry.get('normalized_title', '')
+    if not title:
+        title = str(entry.get('title', '')).lower()
     
-    # 1. Group by First Author's Last Name to reduce comparison complexity
-    for ref in references:
-        author = ref.get('author', '').lower().strip()
-        first_author = ''
+    clean_title = re.sub(r'[\W_]+', '', title).lower()
+    
 
-        if author:
-            # Handle "First Last and ..." or "Last, First" formats
-            authors = re.split(r'\s+and\s+|,', author)
-
-            if authors: 
-                author_parts = authors[0].strip().split()
-                
-                if author_parts:
-                    first_author = author_parts[-1]
+    authors = entry.get('normalized_authors', [])
+    first_author = ""
+    if authors:
+        first_author = re.sub(r'[\W_]+', '', authors[0]).lower()
+    else:
+        raw_author = str(entry.get('author', '')).split(',')[0].split(' and ')[0]
+        first_author = re.sub(r'[\W_]+', '', raw_author).lower()
         
-        if not first_author: continue
-            
-        key = first_author
-        groups[key].append(ref)
+    year = str(entry.get('normalized_year', '')).strip()
+    if not year or year == 'None':
+        year = str(entry.get('year', '')).strip()
     
-    deduplicated = []
+    return f"{clean_title}_{first_author}_{year}"
+
+
+def deduplicate_references_with_mapping(raw_refs: List[Dict]) -> Tuple[List[Dict], Dict[str, str]]:
+    if not raw_refs:
+        return [], {}
+
+    unique_refs = []
+    seen_hashes = {} 
     key_mapping = {} 
     
-    # 2. Process each author group
-    for group_key, refs in groups.items():
-        # Sort by metadata richness (Title length, Year length) to pick the best "Base" entry
-        refs.sort(key=lambda x: (len(x.get('title', '') or ''), len(str(x.get('year', '') or ''))), reverse=True)
-        
-        chosen_entry = refs[0]
-        chosen_key = chosen_entry.get('key')
-        
-        if 'all_keys' not in chosen_entry:
-            chosen_entry['all_keys'] = {chosen_key}
-        
-        unique_in_group = [chosen_entry]
-        
-        # Compare remaining refs against the chosen unique ones
-        for ref in refs[1:]:
-            is_merged = False
-            ref_title = ref.get('title', '').strip().lower()
-            ref_key = ref.get('key', '').strip()
-            
-            for existing in unique_in_group:
-                exist_title = existing.get('title', '').strip().lower()
-                exist_key = existing.get('key', '').strip()
-                exist_year = str(existing.get('year', '')).strip()
-                ref_year = str(ref.get('year', '')).strip()
+    def quality_score(ref):
+        score = 0
+        if ref.get('doi'): score += 5
+        if ref.get('year') and str(ref.get('year')).isdigit(): score += 2
+        if ref.get('author'): score += 2
+        if ref.get('title'): score += 1
+        return score
+    
+    sorted_refs = sorted(raw_refs, key=quality_score, reverse=True)
 
-                should_merge = False
+    for ref in sorted_refs:
+        original_key = ref.get('key')
+        
+        dedup_hash = generate_dedup_key(ref)
+        
+        if len(dedup_hash) < 5: 
+            continue 
+
+        if dedup_hash in seen_hashes and len(dedup_hash) > 5:
+            existing_ref = seen_hashes[dedup_hash]
+            final_key = existing_ref.get('key')
+            
+            if original_key:
+                key_mapping[original_key] = final_key
                 
-                # Heuristic 1: Exact Key Match
-                if ref_key and exist_key and ref_key == exist_key:
-                    should_merge = True
-                    
-                # Heuristic 2: Title Substring Match
-                elif ref_title and exist_title and (ref_title in exist_title or exist_title in ref_title):
-                    should_merge = True
-                    
-                # Heuristic 3: Year Match (Weak fallback if titles are missing)
-                elif ref_year and exist_year and ref_year == exist_year and (not ref_title or not exist_title):
-                    should_merge = True
-
-                if should_merge:
-                    # Merge missing fields into the existing canonical entry
-                    for field in ['author', 'title', 'journal', 'volume', 'year', 'doi', 'pages', 'number']:
-                        if not existing.get(field) and ref.get(field):
-                            existing[field] = ref[field]
-                    
-                    # Map the duplicate key to the canonical key
-                    if ref_key and ref_key != existing['key']:
-                        existing['all_keys'].add(ref_key)
-                        key_mapping[ref_key] = existing['key']
-                        
-                    is_merged = True
-                    break
+        else:
+            seen_hashes[dedup_hash] = ref
+            unique_refs.append(ref)
             
-            # If no match found, treat as a new unique entry in this group
-            if not is_merged:
-                ref['all_keys'] = {ref.get('key')}
-                unique_in_group.append(ref)
-        
-        # Convert sets back to lists for JSON serialization
-        for item in unique_in_group:
-            item['all_keys'] = list(item['all_keys'])
-            
-        deduplicated.extend(unique_in_group)
-            
-    return deduplicated, key_mapping
+            if original_key:
+                key_mapping[original_key] = original_key
+                
+    return unique_refs, key_mapping
 
 
 def export_to_bibtex(entry: dict) -> str:
@@ -474,7 +433,7 @@ def export_to_bibtex(entry: dict) -> str:
     # 1. Define fields to exclude (internal metadata not for export)
     internal_fields = [
         'type', 'key',                  
-        'ref_id', 'all_keys',           
+        'ref_id',           
         'raw', 'source',                
         'normalized_title', 'normalized_authors', 'normalized_year', 
         'author_tokens', 'title_tokens', 
